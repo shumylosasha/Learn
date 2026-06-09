@@ -9,7 +9,7 @@ speak again and it tracks which mistakes keep coming back.
 
 1. **Speak** — pick (or AI-generate) a business topic and record yourself for ~30–120 seconds.
 2. **Analyse** — your audio is transcribed (Whisper / `gpt-4o-transcribe`) and analysed
-   (`gpt-4o`) for grammar, sentence structure, vocabulary and business register.
+   (`gpt-5.5`) for grammar, sentence structure, vocabulary and business register.
 3. **Feedback** — see each mistake (what you said → the correct British version + why), your
    strengths, a CEFR level estimate, and a step-by-step learning plan with exercises.
 4. **Practise** — a chat-based tutor drills you on your actual weak spots (translate, multiple
@@ -52,7 +52,7 @@ Everything is adjustable in **Settings → Models**:
 | Setting        | Default              | Notes                                            |
 | -------------- | -------------------- | ------------------------------------------------ |
 | Transcription  | `gpt-4o-transcribe`  | Or `whisper-1`. Accepts the recorded `.m4a`.     |
-| Analysis/tutor | `gpt-4o`             | Needs a model that supports JSON-schema outputs. |
+| Analysis/tutor | `gpt-5.5`            | Needs a model that supports JSON-schema outputs (e.g. `gpt-5.5`, `gpt-5.5-pro`). |
 | Text-to-speech | `gpt-4o-mini-tts`    | Or `tts-1` / `tts-1-hd`.                          |
 | TTS voice      | `ash`                | Pick any OpenAI voice.                            |
 

@@ -15,7 +15,9 @@ export interface ModelPrefs {
 export const DEFAULT_PREFS: ModelPrefs = {
   // gpt-4o-transcribe is higher quality than whisper-1; both accept m4a.
   transcriptionModel: 'gpt-4o-transcribe',
-  analysisModel: 'gpt-4o',
+  // gpt-5.5 is the current flagship chat model and supports JSON-schema
+  // structured outputs (the GPT-4o/4.1/o-series chat models were retired).
+  analysisModel: 'gpt-5.5',
   ttsModel: 'gpt-4o-mini-tts',
   ttsVoice: 'ash', // a clear, fairly neutral voice
 };
