@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Business English Coach",
+    "slug": "business-english-coach",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "bizenglish",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bizenglish.coach",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "We use the microphone to record your spoken English so the AI can analyse it and give you feedback.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.bizenglish.coach",
+      "permissions": ["RECORD_AUDIO"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record your spoken English."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
