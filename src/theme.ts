@@ -23,6 +23,23 @@ export const severityColor = (severity: number) => {
   return colors.textMuted;
 };
 
+export const trendColor = (status: string) => {
+  switch (status) {
+    case 'resolved':
+      return colors.success;
+    case 'improved':
+      return '#7FC8A0';
+    case 'persistent':
+      return colors.textMuted;
+    case 'worse':
+      return colors.danger;
+    case 'new':
+      return colors.warning;
+    default:
+      return colors.textMuted;
+  }
+};
+
 export const categoryColor = (category: string) => {
   switch (category) {
     case 'grammar':

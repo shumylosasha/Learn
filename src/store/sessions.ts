@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Analysis, ChatMessage, Session } from '@/types';
+import type { ChatMessage, Session, SessionAnalysis } from '@/types';
 import { aggregateRecurringMistakes } from '@/lib/mistakes';
 
 const STORAGE_KEY = 'sessions_v1';
@@ -16,7 +16,7 @@ interface SessionsState {
   createSession: (input: { topic: string; audioUri: string | null; durationMs: number }) => Session;
   getSession: (id: string) => Session | undefined;
   updateSession: (id: string, patch: Partial<Session>) => void;
-  setAnalysis: (id: string, analysis: Analysis) => void;
+  setAnalysis: (id: string, analysis: SessionAnalysis) => void;
   appendPractice: (id: string, message: ChatMessage) => void;
   deleteSession: (id: string) => void;
   recurring: () => ReturnType<typeof aggregateRecurringMistakes>;

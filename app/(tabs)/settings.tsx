@@ -142,9 +142,49 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
+      <View>
+        <SectionTitle>Reviews</SectionTitle>
+        <Card style={{ gap: spacing.md }}>
+          <Label>Auto-generate a cumulative review</Label>
+          <View style={styles.voiceRow}>
+            {[
+              { label: 'Weekly', days: 7 },
+              { label: 'Daily', days: 1 },
+              { label: 'Manual only', days: 0 },
+            ].map((opt) => (
+              <Pressable
+                key={opt.label}
+                onPress={() => setPrefs({ reviewCadenceDays: opt.days })}
+                style={[
+                  styles.voiceChip,
+                  prefs.reviewCadenceDays === opt.days && {
+                    backgroundColor: colors.accent,
+                    borderColor: colors.accent,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.voiceText,
+                    prefs.reviewCadenceDays === opt.days && { color: colors.accentText },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.note}>
+            When due, the review is generated automatically the next time you open the app. You can
+            also tap “Review now” on the Progress tab anytime. True overnight processing isn’t
+            possible without a server.
+          </Text>
+        </Card>
+      </View>
+
       <Text style={styles.about}>
-        Business English Coach · Speak → AI feedback → targeted practice. Built for British business
-        English.
+        Business English Coach · Speak → capture → weekly review → targeted practice. Built for
+        British business English.
       </Text>
     </ScrollView>
   );

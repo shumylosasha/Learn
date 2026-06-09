@@ -15,17 +15,18 @@ import { categoryColor, colors, font, radius, severityColor, spacing } from '@/t
 import { useSessions } from '@/store/sessions';
 import { processSession } from '@/lib/pipeline';
 import { formatDuration, playUri } from '@/lib/audio';
-import type { Exercise, LessonStep, Mistake } from '@/types';
+import type { Mistake } from '@/types';
 
 const STATUS_LABEL: Record<string, string> = {
   transcribing: 'Transcribing your audio…',
-  analyzing: 'Analysing your English…',
+  analyzing: 'Capturing your mistakes…',
 };
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useSessions((s) => s.sessions.find((x) => x.id === id));
+  const [showTranscript, setShowTranscript] = useState(false);
 
   if (!session) {
     return <Empty title="Session not found" subtitle="It may have been deleted." />;
@@ -33,10 +34,13 @@ export default function SessionScreen() {
 
   const busy = session.status === 'transcribing' || session.status === 'analyzing';
   const analysis = session.analysis;
+  const totalOcc = analysis
+    ? analysis.mistakes.reduce((a, m) => a + (m.occurrences || 1), 0)
+    : 0;
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Feedback' }} />
+      <Stack.Screen options={{ title: 'Recording' }} />
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.metaRow}>
           <Text style={styles.date}>
@@ -75,66 +79,67 @@ export default function SessionScreen() {
           </Card>
         )}
 
-        {session.transcript ? (
-          <View>
-            <SectionTitle>What you said</SectionTitle>
-            <Card>
-              <Text style={styles.transcript}>{session.transcript}</Text>
-            </Card>
-          </View>
-        ) : null}
-
         {analysis && (
           <>
             <View>
-              <SectionTitle>Overall</SectionTitle>
+              <SectionTitle>This recording</SectionTitle>
               <Card style={{ gap: spacing.md }}>
                 <View style={styles.levelRow}>
                   <Pill label={`Level ${analysis.level}`} color={colors.success} filled />
                   <Pill
-                    label={`${analysis.mistakes.length} things to fix`}
+                    label={`${analysis.mistakes.length} mistake types · ${totalOcc}×`}
                     color={colors.warning}
                   />
                 </View>
                 <Text style={styles.summary}>{analysis.summary}</Text>
-                {analysis.strengths.length > 0 && (
-                  <View style={{ gap: 6 }}>
-                    {analysis.strengths.map((s, i) => (
-                      <View key={i} style={styles.strengthRow}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                        <Text style={styles.strengthText}>{s}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
               </Card>
             </View>
 
-            <View>
-              <SectionTitle>Mistakes</SectionTitle>
-              <View style={{ gap: spacing.md }}>
-                {analysis.mistakes.map((m, i) => (
-                  <MistakeCard key={i} mistake={m} />
-                ))}
+            {analysis.mistakes.length > 0 && (
+              <View>
+                <SectionTitle>Mistakes captured</SectionTitle>
+                <View style={{ gap: spacing.md }}>
+                  {analysis.mistakes.map((m, i) => (
+                    <MistakeCard key={i} mistake={m} />
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
-            <View>
-              <SectionTitle>Your learning plan</SectionTitle>
-              <View style={{ gap: spacing.md }}>
-                {analysis.lessonPlan.map((step, i) => (
-                  <LessonCard key={i} step={step} index={i} />
-                ))}
-              </View>
-            </View>
+            <Card style={styles.noteCard}>
+              <Ionicons name="trending-up" size={18} color={colors.success} />
+              <Text style={styles.noteText}>
+                These feed your weekly review, where you’ll get a consolidated plan and see whether
+                you’re improving. Check the Progress tab.
+              </Text>
+            </Card>
 
             <Button
-              title="Practise these with the tutor"
-              onPress={() => router.push(`/practice/${session.id}`)}
-              style={{ marginTop: spacing.sm }}
+              title="Practise my weak spots"
+              onPress={() => router.push('/practice/weakspots')}
             />
           </>
         )}
+
+        {session.transcript ? (
+          <View>
+            <Pressable onPress={() => setShowTranscript((v) => !v)} style={styles.transToggle}>
+              <Text style={styles.transToggleText}>
+                {showTranscript ? 'Hide transcript' : 'Show transcript'}
+              </Text>
+              <Ionicons
+                name={showTranscript ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={colors.textMuted}
+              />
+            </Pressable>
+            {showTranscript && (
+              <Card>
+                <Text style={styles.transcript}>{session.transcript}</Text>
+              </Card>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
     </>
   );
@@ -181,74 +186,19 @@ function MistakeCard({ mistake }: { mistake: Mistake }) {
     <Card style={{ gap: spacing.sm }}>
       <View style={styles.mistakeHeader}>
         <Pill label={mistake.category} color={categoryColor(mistake.category)} filled />
-        <View
-          style={[styles.severityDot, { backgroundColor: severityColor(mistake.severity) }]}
-        />
+        <View style={[styles.severityDot, { backgroundColor: severityColor(mistake.severity) }]} />
         <Text style={styles.mistakeType}>{mistake.type}</Text>
+        {mistake.occurrences > 1 && (
+          <Pill label={`${mistake.occurrences}×`} color={colors.warning} />
+        )}
       </View>
       <View style={styles.quoteBlock}>
         <Text style={styles.quoteWrong}>“{mistake.quote}”</Text>
-        <View style={styles.arrowRow}>
-          <Ionicons name="arrow-down" size={14} color={colors.success} />
-        </View>
+        <Ionicons name="arrow-down" size={14} color={colors.success} />
         <Text style={styles.quoteRight}>“{mistake.correction}”</Text>
       </View>
       <Text style={styles.explanation}>{mistake.explanation}</Text>
     </Card>
-  );
-}
-
-function LessonCard({ step, index }: { step: LessonStep; index: number }) {
-  const [open, setOpen] = useState(index === 0);
-  return (
-    <Card>
-      <Pressable style={styles.lessonHeader} onPress={() => setOpen((o) => !o)}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.lessonIndex}>STEP {index + 1}</Text>
-          <Text style={styles.lessonTitle}>{step.title}</Text>
-        </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
-      </Pressable>
-      {open && (
-        <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-          <Text style={styles.grammar}>{step.grammarExplanation}</Text>
-          {step.exercises.map((ex, i) => (
-            <ExerciseItem key={i} exercise={ex} number={i + 1} />
-          ))}
-        </View>
-      )}
-    </Card>
-  );
-}
-
-function ExerciseItem({ exercise, number }: { exercise: Exercise; number: number }) {
-  const [revealed, setRevealed] = useState(false);
-  const kindLabel = exercise.kind.replace('_', ' ');
-  return (
-    <View style={styles.exercise}>
-      <Text style={styles.exerciseKind}>
-        {number}. {kindLabel}
-      </Text>
-      <Text style={styles.exercisePrompt}>{exercise.prompt}</Text>
-      {exercise.options?.length ? (
-        <View style={{ gap: 4, marginTop: 4 }}>
-          {exercise.options.map((o, i) => (
-            <Text key={i} style={styles.option}>
-              • {o}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-      <Pressable onPress={() => setRevealed((r) => !r)} style={styles.revealBtn}>
-        <Text style={styles.revealText}>{revealed ? 'Hide answer' : 'Show answer'}</Text>
-      </Pressable>
-      {revealed && (
-        <View style={styles.answerBox}>
-          <Text style={styles.answerText}>{exercise.answer}</Text>
-          {exercise.hint ? <Text style={styles.hintText}>{exercise.hint}</Text> : null}
-        </View>
-      )}
-    </View>
   );
 }
 
@@ -259,17 +209,10 @@ const styles = StyleSheet.create({
   topic: { color: colors.text, fontSize: font.body, lineHeight: 24, fontWeight: '600' },
   playRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   playText: { color: colors.success, fontSize: font.small, fontWeight: '600' },
-  statusCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
+  statusCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   statusText: { color: colors.text, fontSize: font.body, fontWeight: '600' },
-  transcript: { color: colors.textMuted, fontSize: font.body, lineHeight: 24, fontStyle: 'italic' },
   levelRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   summary: { color: colors.text, fontSize: font.body, lineHeight: 24 },
-  strengthRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  strengthText: { color: colors.textMuted, fontSize: font.small, flex: 1, lineHeight: 20 },
   mistakeHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   severityDot: { width: 8, height: 8, borderRadius: 4 },
   mistakeType: { color: colors.text, fontSize: font.small, fontWeight: '700', flex: 1 },
@@ -280,42 +223,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   quoteWrong: { color: colors.danger, fontSize: font.body, lineHeight: 22 },
-  arrowRow: { alignItems: 'flex-start' },
   quoteRight: { color: colors.success, fontSize: font.body, lineHeight: 22, fontWeight: '600' },
   explanation: { color: colors.textMuted, fontSize: font.small, lineHeight: 21 },
-  lessonHeader: { flexDirection: 'row', alignItems: 'center' },
-  lessonIndex: {
-    color: colors.success,
-    fontSize: font.tiny,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  lessonTitle: { color: colors.text, fontSize: font.h3, fontWeight: '700', marginTop: 2 },
-  grammar: { color: colors.textMuted, fontSize: font.body, lineHeight: 23 },
-  exercise: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: 4,
-  },
-  exerciseKind: {
-    color: colors.textFaint,
-    fontSize: font.tiny,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  exercisePrompt: { color: colors.text, fontSize: font.body, lineHeight: 22 },
-  option: { color: colors.textMuted, fontSize: font.small, lineHeight: 20 },
-  revealBtn: { marginTop: spacing.xs },
-  revealText: { color: colors.success, fontSize: font.small, fontWeight: '600' },
-  answerBox: {
-    marginTop: 4,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.success,
-    paddingLeft: spacing.md,
-    gap: 2,
-  },
-  answerText: { color: colors.text, fontSize: font.body, fontWeight: '600' },
-  hintText: { color: colors.textFaint, fontSize: font.small, fontStyle: 'italic' },
+  noteCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  noteText: { color: colors.textMuted, fontSize: font.small, lineHeight: 20, flex: 1 },
+  transToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
+  transToggleText: { color: colors.textMuted, fontSize: font.small, fontWeight: '600' },
+  transcript: { color: colors.textMuted, fontSize: font.body, lineHeight: 24, fontStyle: 'italic' },
 });

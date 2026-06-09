@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,13 +11,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { Audio } from 'expo-av';
 import { Empty } from '@/components/ui';
 import { colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
+import { useReviews } from '@/store/reviews';
+import { usePractice } from '@/store/practice';
 import { chatComplete, synthesizeSpeech, type ChatMessageInput } from '@/api/openai';
 import { practiceSystemPrompt } from '@/api/prompts';
 import { aggregateRecurringMistakes, recurringMistakesContext } from '@/lib/mistakes';
@@ -28,10 +31,11 @@ function uid() {
 }
 
 export default function PracticeScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const session = useSessions((s) => s.sessions.find((x) => x.id === id));
   const allSessions = useSessions((s) => s.sessions);
-  const appendPractice = useSessions((s) => s.appendPractice);
+  const latestReview = useReviews((s) => s.reviews[0]);
+  const messages = usePractice((s) => s.messages);
+  const append = usePractice((s) => s.append);
+  const reset = usePractice((s) => s.reset);
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
 
@@ -40,19 +44,15 @@ export default function PracticeScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const kickedOff = useRef(false);
 
-  if (!session) {
-    return <Empty title="Session not found" />;
-  }
-
-  const messages = session.practice;
-
   const systemPrompt = (): string => {
-    const mistakeCtx =
-      session.analysis?.mistakes
-        .map((m) => `- [${m.category}] ${m.type}: "${m.quote}" → "${m.correction}"`)
-        .join('\n') ?? 'No specific mistakes recorded.';
-    const recurring = recurringMistakesContext(aggregateRecurringMistakes(allSessions));
-    return practiceSystemPrompt(session.topic, mistakeCtx, recurring);
+    const weakSpots = recurringMistakesContext(aggregateRecurringMistakes(allSessions));
+    const planContext = latestReview
+      ? `Focus areas: ${latestReview.focus.join(', ')}.\n` +
+        latestReview.lessonPlan
+          .map((s) => `• ${s.title}: ${s.grammarExplanation}`)
+          .join('\n')
+      : 'No review yet — work from the recurring weak spots above.';
+    return practiceSystemPrompt(weakSpots, planContext);
   };
 
   const send = async (text: string) => {
@@ -64,24 +64,13 @@ export default function PracticeScreen() {
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ];
       if (text) {
-        const userMsg: ChatMessage = {
-          id: uid(),
-          role: 'user',
-          content: text,
-          createdAt: Date.now(),
-        };
-        appendPractice(session.id, userMsg);
+        append({ id: uid(), role: 'user', content: text, createdAt: Date.now() });
         history.push({ role: 'user', content: text });
       }
       const reply = await chatComplete(apiKey, history, prefs.analysisModel);
-      appendPractice(session.id, {
-        id: uid(),
-        role: 'assistant',
-        content: reply,
-        createdAt: Date.now(),
-      });
+      append({ id: uid(), role: 'assistant', content: reply, createdAt: Date.now() });
     } catch (e) {
-      appendPractice(session.id, {
+      append({
         id: uid(),
         role: 'assistant',
         content: `⚠️ ${e instanceof Error ? e.message : 'Something went wrong.'}`,
@@ -93,7 +82,7 @@ export default function PracticeScreen() {
     }
   };
 
-  // Kick off the tutor's opening message once.
+  // Kick off the tutor's opening message once, if the thread is empty.
   useEffect(() => {
     if (!kickedOff.current && messages.length === 0 && apiKey) {
       kickedOff.current = true;
@@ -108,13 +97,36 @@ export default function PracticeScreen() {
     send(text);
   };
 
+  const onReset = () => {
+    Alert.alert('Start fresh?', 'This clears the current practice conversation.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: () => {
+          reset();
+          kickedOff.current = false;
+        },
+      },
+    ]);
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <Stack.Screen options={{ title: 'Practice' }} />
+      <Stack.Screen
+        options={{
+          title: 'Practice',
+          headerRight: () => (
+            <Pressable onPress={onReset} hitSlop={10}>
+              <Ionicons name="refresh" size={20} color={colors.textMuted} />
+            </Pressable>
+          ),
+        }}
+      />
       {!apiKey ? (
         <Empty title="Add your API key" subtitle="Set your OpenAI key in Settings to practise." />
       ) : (
@@ -128,7 +140,13 @@ export default function PracticeScreen() {
               <Text style={styles.warming}>Your tutor is getting ready…</Text>
             )}
             {messages.map((m) => (
-              <Bubble key={m.id} message={m} ttsModel={prefs.ttsModel} voice={prefs.ttsVoice} apiKey={apiKey} />
+              <Bubble
+                key={m.id}
+                message={m}
+                ttsModel={prefs.ttsModel}
+                voice={prefs.ttsVoice}
+                apiKey={apiKey}
+              />
             ))}
             {sending && messages.length > 0 && (
               <View style={[styles.bubble, styles.assistant]}>
@@ -196,7 +214,7 @@ function Bubble({
 
   return (
     <View style={[styles.bubble, isUser ? styles.user : styles.assistant]}>
-      <Text style={[styles.bubbleText, isUser && { color: colors.text }]}>{message.content}</Text>
+      <Text style={styles.bubbleText}>{message.content}</Text>
       {!isUser && (
         <Pressable onPress={speak} style={styles.speakBtn} hitSlop={8}>
           {loadingTts ? (
@@ -213,16 +231,8 @@ function Bubble({
 const styles = StyleSheet.create({
   chat: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   warming: { color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
-  bubble: {
-    maxWidth: '88%',
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  user: {
-    alignSelf: 'flex-end',
-    backgroundColor: colors.accentSoft,
-    borderBottomRightRadius: 4,
-  },
+  bubble: { maxWidth: '88%', borderRadius: radius.lg, padding: spacing.md },
+  user: { alignSelf: 'flex-end', backgroundColor: colors.accentSoft, borderBottomRightRadius: 4 },
   assistant: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surface,

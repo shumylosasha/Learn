@@ -5,17 +5,31 @@ You speak, the AI transcribes and analyses your grammar and word choice, points 
 mistakes, builds a targeted learning plan, and runs you through interactive practice — then you
 speak again and it tracks which mistakes keep coming back.
 
-## The loop
+## The idea
 
-1. **Speak** — pick (or AI-generate) a business topic and record yourself for ~30–120 seconds.
-2. **Analyse** — your audio is transcribed (Whisper / `gpt-4o-transcribe`) and analysed
-   (`gpt-5.5`) for grammar, sentence structure, vocabulary and business register.
-3. **Feedback** — see each mistake (what you said → the correct British version + why), your
-   strengths, a CEFR level estimate, and a step-by-step learning plan with exercises.
-4. **Practise** — a chat-based tutor drills you on your actual weak spots (translate, multiple
-   choice, rewrite, fill-the-gap), with optional text-to-speech.
-5. **Repeat** — the **Progress** tab aggregates recurring mistakes across all sessions so you
-   know what to focus on.
+It's built for **daily use over time**, not one-off analysis. Each recording is captured
+*lightly*; the real teaching happens in a **periodic review** that synthesises everything and
+tracks whether you're actually improving.
+
+1. **Speak** — pick (or AI-generate) a topic and record yourself. Recordings can be short or a
+   full 30–60 min talk (audio is recorded at a low, speech-optimised bitrate so even long talks
+   stay under the transcription upload limit).
+2. **Capture (lightweight)** — your audio is transcribed (`gpt-4o-transcribe`) and analysed
+   (`gpt-5.5`) into a *consolidated* list of mistake **types** with how often each occurs — not an
+   exhaustive, overwhelming list. No per-recording lesson.
+3. **Weekly review (the teaching)** — on a cadence (default weekly, or manual), the app aggregates
+   all recordings since the last review, **compares against the previous review** to show what's
+   *resolved / improving / persistent / worse / new*, writes an encouraging progress narrative, and
+   produces one consolidated lesson plan for what to focus on now.
+4. **Practise** — a persistent chat tutor drills you on your cumulative weak spots and the latest
+   review's plan (translate, multiple choice, rewrite, fill-the-gap), with optional text-to-speech.
+5. **Repeat** — the **Progress** tab shows the latest review, all-time recurring mistakes, past
+   reviews, and your history grouped by day (each day = one "lesson").
+
+> **On automation:** truly analysing "while you sleep" with the app closed isn't possible in a
+> client-only app — there's no server and phones don't run background jobs reliably. So a due
+> review is generated automatically *the next time you open the app*, plus a manual **Review now**
+> button. True overnight processing would need the optional backend.
 
 ## Tech
 
@@ -62,20 +76,27 @@ Everything is adjustable in **Settings → Models**:
 app/                     # expo-router screens
   (tabs)/
     index.tsx            # Speak / record
-    progress.tsx         # Recurring mistakes + history
-    settings.tsx         # API key + model prefs
-  session/[id].tsx       # Transcript, mistakes, learning plan
-  practice/[id].tsx      # Chat tutor
+    progress.tsx         # Latest review, recurring mistakes, past reviews, history
+    settings.tsx         # API key, model prefs, review cadence
+  session/[id].tsx       # One recording: captured mistakes (lightweight)
+  practice/[id].tsx      # Persistent weak-spots chat tutor
 src/
-  api/openai.ts          # OpenAI calls (transcribe, analyse, chat, TTS)
-  api/prompts.ts         # System prompts + analysis JSON schema
-  lib/                   # audio, topics, mistake aggregation, pipeline
-  store/                 # zustand stores (settings, sessions) + secure storage
-  components/ui.tsx      # shared UI primitives
+  api/openai.ts          # OpenAI calls (transcribe, analyse, review, chat, TTS)
+  api/prompts.ts         # System prompts + JSON schemas (capture + review)
+  lib/                   # audio, topics, mistake aggregation + trends, pipeline, review
+  store/                 # zustand stores (settings, sessions, reviews, practice)
+  components/            # shared UI primitives + LessonPlan
   theme.ts, types.ts
 ```
 
-## Scope notes (v1)
+## How improvement is tracked
+
+Each recording's mistakes are consolidated by a reusable **type** label and counted by
+*occurrences* (a 35-min talk that repeats an error 12× counts as 12). Each review stores a snapshot
+of `{type: count}` for its period; the next review compares against it to label every type as
+resolved / improved / persistent / worse / new — so progress is concrete, not vibes.
+
+## Scope notes
 
 - Analysis covers **grammar + vocabulary/register** only. Pronunciation/accent and filler-word
   analysis are intentionally out of scope (the transcript can't show them reliably).

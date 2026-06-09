@@ -3,6 +3,35 @@ import * as FileSystem from 'expo-file-system';
 
 let activeRecording: Audio.Recording | null = null;
 
+// Speech-optimised, low-bitrate mono so even a 35–60 min talk stays well under
+// the transcription API's 25 MB upload limit (~32 kbps ≈ 8 MB for 35 min).
+const SPEECH_RECORDING_OPTIONS: Audio.RecordingOptions = {
+  isMeteringEnabled: false,
+  android: {
+    extension: '.m4a',
+    outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+    audioEncoder: Audio.AndroidAudioEncoder.AAC,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 32000,
+  },
+  ios: {
+    extension: '.m4a',
+    outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+    audioQuality: Audio.IOSAudioQuality.MEDIUM,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 32000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/webm',
+    bitsPerSecond: 32000,
+  },
+};
+
 export async function ensureMicPermission(): Promise<boolean> {
   const { granted } = await Audio.requestPermissionsAsync();
   return granted;
@@ -24,7 +53,7 @@ export async function startRecording(): Promise<void> {
   });
 
   const recording = new Audio.Recording();
-  await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+  await recording.prepareToRecordAsync(SPEECH_RECORDING_OPTIONS);
   await recording.startAsync();
   activeRecording = recording;
 }

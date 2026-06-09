@@ -10,6 +10,8 @@ export interface ModelPrefs {
   analysisModel: string;
   ttsModel: string;
   ttsVoice: string;
+  /** Auto-generate a cumulative review every N days (0 = manual only). */
+  reviewCadenceDays: number;
 }
 
 export const DEFAULT_PREFS: ModelPrefs = {
@@ -20,6 +22,7 @@ export const DEFAULT_PREFS: ModelPrefs = {
   analysisModel: 'gpt-5.5',
   ttsModel: 'gpt-4o-mini-tts',
   ttsVoice: 'ash', // a clear, fairly neutral voice
+  reviewCadenceDays: 7,
 };
 
 export const TTS_VOICES = [

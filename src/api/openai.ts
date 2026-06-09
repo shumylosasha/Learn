@@ -1,9 +1,12 @@
 import { Platform } from 'react-native';
-import type { Analysis } from '@/types';
+import type { LessonStep, SessionAnalysis } from '@/types';
 import {
   ANALYSIS_SCHEMA,
   ANALYSIS_SYSTEM_PROMPT,
   buildAnalysisUserMessage,
+  buildReviewUserMessage,
+  REVIEW_SCHEMA,
+  REVIEW_SYSTEM_PROMPT,
   TOPIC_GENERATION_PROMPT,
 } from './prompts';
 
@@ -63,32 +66,72 @@ export async function transcribeAudio(
   return (data.text ?? '').trim();
 }
 
-/** Analyse a transcript and produce structured feedback + a lesson plan. */
+/** Lightweight per-recording capture: mistakes consolidated by type. */
 export async function analyzeSpeaking(
   apiKey: string,
   topic: string,
   transcript: string,
   model: string,
-): Promise<Analysis> {
+): Promise<SessionAnalysis> {
+  const content = await structuredCompletion(
+    apiKey,
+    model,
+    ANALYSIS_SYSTEM_PROMPT,
+    buildAnalysisUserMessage(topic, transcript),
+    ANALYSIS_SCHEMA,
+  );
+  return JSON.parse(content) as SessionAnalysis;
+}
+
+export interface ReviewPlan {
+  narrative: string;
+  focus: string[];
+  lessonPlan: LessonStep[];
+}
+
+/** Periodic synthesis: narrative + focus + consolidated lesson plan. */
+export async function generateReviewPlan(
+  apiKey: string,
+  model: string,
+  sessionCount: number,
+  trendTable: string,
+  topTypes: string,
+): Promise<ReviewPlan> {
+  const content = await structuredCompletion(
+    apiKey,
+    model,
+    REVIEW_SYSTEM_PROMPT,
+    buildReviewUserMessage(sessionCount, trendTable, topTypes),
+    REVIEW_SCHEMA,
+  );
+  return JSON.parse(content) as ReviewPlan;
+}
+
+async function structuredCompletion(
+  apiKey: string,
+  model: string,
+  system: string,
+  user: string,
+  schema: unknown,
+): Promise<string> {
   const res = await fetch(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      temperature: 0.3,
       messages: [
-        { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },
-        { role: 'user', content: buildAnalysisUserMessage(topic, transcript) },
+        { role: 'system', content: system },
+        { role: 'user', content: user },
       ],
-      response_format: { type: 'json_schema', json_schema: ANALYSIS_SCHEMA },
+      response_format: { type: 'json_schema', json_schema: schema },
     }),
   });
 
-  if (!res.ok) throw new OpenAIError(`Analysis failed: ${await readError(res)}`);
+  if (!res.ok) throw new OpenAIError(await readError(res));
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new OpenAIError('Analysis returned no content.');
-  return JSON.parse(content) as Analysis;
+  if (!content) throw new OpenAIError('Model returned no content.');
+  return content;
 }
 
 /** General chat completion, used for the practice tutor. */
