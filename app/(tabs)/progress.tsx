@@ -14,13 +14,11 @@ import {
   TREND_LABEL,
 } from '@/lib/mistakes';
 import { canReview, generateReview } from '@/lib/review';
-import { formatDuration } from '@/lib/audio';
-import type { MistakeTrend, Review, Session } from '@/types';
+import type { MistakeTrend, Review } from '@/types';
 
 export default function ProgressScreen() {
   const router = useRouter();
   const sessions = useSessions((s) => s.sessions);
-  const deleteSession = useSessions((s) => s.deleteSession);
   const reviews = useReviews((s) => s.reviews);
   const generating = useReviews((s) => s.generating);
   const apiKey = useSettings((s) => s.apiKey);
@@ -47,13 +45,6 @@ export default function ProgressScreen() {
     }
     const r = await generateReview();
     if (!r) Alert.alert('Nothing new to review', 'Record something first, then try again.');
-  };
-
-  const confirmDelete = (id: string) => {
-    Alert.alert('Delete recording?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteSession(id) },
-    ]);
   };
 
   return (
@@ -142,9 +133,6 @@ export default function ProgressScreen() {
         </View>
       )}
 
-      <View style={styles.divider} />
-
-      <SessionHistory sessions={sessions} onOpen={(id) => router.push(`/session/${id}`)} onDelete={confirmDelete} />
     </ScrollView>
   );
 }
@@ -217,64 +205,6 @@ function TrendRow({ trend }: { trend: MistakeTrend }) {
   );
 }
 
-function SessionHistory({
-  sessions,
-  onOpen,
-  onDelete,
-}: {
-  sessions: Session[];
-  onOpen: (id: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  // Group by calendar day so each day reads as one "lesson".
-  const groups = useMemo(() => {
-    const map = new Map<string, Session[]>();
-    for (const s of sessions) {
-      const key = new Date(s.createdAt).toLocaleDateString('en-GB', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-      });
-      const arr = map.get(key) ?? [];
-      arr.push(s);
-      map.set(key, arr);
-    }
-    return Array.from(map.entries());
-  }, [sessions]);
-
-  return (
-    <View>
-      <SectionTitle>History</SectionTitle>
-      <View style={{ gap: spacing.lg }}>
-        {groups.map(([day, items]) => (
-          <View key={day} style={{ gap: spacing.sm }}>
-            <Text style={styles.dayHeader}>{day}</Text>
-            {items.map((s) => (
-              <Pressable key={s.id} onPress={() => onOpen(s.id)} onLongPress={() => onDelete(s.id)}>
-                <Card style={styles.historyCard}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={styles.histTopic} numberOfLines={2}>
-                      {s.topic}
-                    </Text>
-                    <View style={styles.histMeta}>
-                      {s.durationMs > 0 && (
-                        <Text style={styles.histDate}>{formatDuration(s.durationMs)}</Text>
-                      )}
-                      <StatusTag status={s.status} count={s.analysis?.mistakes.length} />
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
-                </Card>
-              </Pressable>
-            ))}
-          </View>
-        ))}
-      </View>
-      <Text style={styles.hintCenter}>Long-press a recording to delete it.</Text>
-    </View>
-  );
-}
-
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <View style={styles.stat}>
@@ -282,17 +212,6 @@ function Stat({ value, label }: { value: number; label: string }) {
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
-}
-
-function StatusTag({ status, count }: { status: string; count?: number }) {
-  if (status === 'ready' && count != null) {
-    return <Pill label={`${count} types`} color={colors.success} />;
-  }
-  if (status === 'error') return <Pill label="error" color={colors.danger} />;
-  if (status === 'transcribing' || status === 'analyzing') {
-    return <Pill label="processing…" color={colors.warning} />;
-  }
-  return <Pill label={status} color={colors.textMuted} />;
 }
 
 const styles = StyleSheet.create({
@@ -317,7 +236,6 @@ const styles = StyleSheet.create({
   },
   practiceCtaTitle: { color: colors.accentText, fontSize: font.body, fontWeight: '800' },
   practiceCtaSub: { color: colors.accentText, fontSize: font.tiny, opacity: 0.85, marginTop: 1 },
-  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
   catRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   recHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   catDot: { width: 8, height: 8, borderRadius: 4 },
@@ -341,15 +259,4 @@ const styles = StyleSheet.create({
   pastReview: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   pastDate: { color: colors.textMuted, fontSize: font.tiny, fontWeight: '700', marginBottom: 2 },
   pastNarrative: { color: colors.textMuted, fontSize: font.small, lineHeight: 19 },
-  dayHeader: {
-    color: colors.textMuted,
-    fontSize: font.tiny,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  historyCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  histTopic: { color: colors.text, fontSize: font.body, fontWeight: '600', lineHeight: 21 },
-  histMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  histDate: { color: colors.textFaint, fontSize: font.tiny },
 });

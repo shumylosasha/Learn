@@ -95,6 +95,11 @@ export default function SessionScreen() {
               </Card>
             </View>
 
+            <Button
+              title="Practise my weak spots"
+              onPress={() => router.push('/practice/weakspots')}
+            />
+
             {analysis.mistakes.length > 0 && (
               <View>
                 <SectionTitle>Mistakes captured</SectionTitle>
@@ -113,11 +118,6 @@ export default function SessionScreen() {
                 you’re improving. Check the Progress tab.
               </Text>
             </Card>
-
-            <Button
-              title="Practise my weak spots"
-              onPress={() => router.push('/practice/weakspots')}
-            />
           </>
         )}
 
