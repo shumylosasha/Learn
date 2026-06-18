@@ -34,6 +34,11 @@ import type { ChatMessage, Mistake } from '@/types';
 
 const COMPLETE_MARKER = /\b(lesson|session|drill)\s+complete\b/i;
 
+// A single stable reference for "no messages yet". Returning a fresh `[]` from a
+// zustand selector makes useSyncExternalStore think the snapshot changed every
+// render → infinite loop → crash. Default to this constant instead.
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
 function recordingMistakesContext(mistakes: Mistake[]): string {
   return mistakes
     .map(
@@ -59,7 +64,7 @@ export default function PracticeScreen() {
   const loadLessons = useLessons((s) => s.load);
   const markLessonComplete = useLessons((s) => s.markComplete);
   const latestReview = useReviews((s) => s.reviews[0]);
-  const messages = usePractice((s) => s.threads[threadId] ?? []);
+  const messages = usePractice((s) => s.threads[threadId]) ?? EMPTY_MESSAGES;
   const loaded = usePractice((s) => s.loaded[threadId]);
   const load = usePractice((s) => s.load);
   const append = usePractice((s) => s.append);

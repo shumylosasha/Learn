@@ -81,20 +81,6 @@ export default function SessionScreen() {
 
         {analysis && (
           <>
-            <View>
-              <SectionTitle>This recording</SectionTitle>
-              <Card style={{ gap: spacing.md }}>
-                <View style={styles.levelRow}>
-                  <Pill label={`Level ${analysis.level}`} color={colors.success} filled />
-                  <Pill
-                    label={`${analysis.mistakes.length} mistake types · ${totalOcc}×`}
-                    color={colors.warning}
-                  />
-                </View>
-                <Text style={styles.summary}>{analysis.summary}</Text>
-              </Card>
-            </View>
-
             {analysis.mistakes.length > 0 && (
               <Button
                 title="Practise these mistakes"
@@ -112,14 +98,6 @@ export default function SessionScreen() {
                 </View>
               </View>
             )}
-
-            <Card style={styles.noteCard}>
-              <Ionicons name="trending-up" size={18} color={colors.success} />
-              <Text style={styles.noteText}>
-                These feed your weekly review, where you’ll get a consolidated plan and see whether
-                you’re improving. Check the Progress tab.
-              </Text>
-            </Card>
           </>
         )}
 
