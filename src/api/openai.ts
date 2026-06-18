@@ -153,12 +153,13 @@ export async function generateLearningPath(
   apiKey: string,
   model: string,
   recurringContext: string,
+  reviewContext?: string,
 ): Promise<LessonSpec[]> {
   const content = await structuredCompletion(
     apiKey,
     model,
     LEARNING_PATH_SYSTEM_PROMPT,
-    buildLearningPathUserMessage(recurringContext),
+    buildLearningPathUserMessage(recurringContext, reviewContext),
     LEARNING_PATH_SCHEMA,
   );
   const parsed = JSON.parse(content) as { lessons?: LessonSpec[] };

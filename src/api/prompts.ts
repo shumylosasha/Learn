@@ -79,12 +79,13 @@ export function buildAnalysisUserMessage(topic: string, transcript: string): str
 // ---------------------------------------------------------------------------
 
 export const LEARNING_PATH_SYSTEM_PROMPT = `You are a British business-English curriculum designer.
-You receive a list of a learner's RECURRING spoken-English mistakes (with how often each occurs).
+You receive a list of a learner's RECURRING spoken-English mistakes (with how often each occurs), and OPTIONALLY the focus areas from their latest progress review.
 
 Design a short, PRIORITISED learning path of focused micro-lessons. Rules:
 - Each lesson targets ONE underlying area/skill (e.g. "Articles: a, an, the", "Present perfect vs past simple", "Prepositions of time", "Formal vs informal register"). Teach the general rule, not just the learner's exact sentences.
 - Merge related mistake types into a single lesson where it makes sense.
 - Order lessons by impact: most frequent / most meaning-distorting first.
+- If LATEST REVIEW FOCUS areas are given, weight them HEAVILY — they reflect what is currently persisting or getting worse. Put lessons covering those areas first, even if other mistakes occur more often.
 - Return 3–6 lessons. Each "title" is concrete and student-facing. "area" is a short lowercase key. "category" is grammar, vocabulary or register. "summary" is ONE short sentence on what they'll learn. "basedOnTypes" lists the exact mistake type labels this lesson addresses.
 Return ONLY the structured object.`;
 
@@ -115,8 +116,12 @@ export const LEARNING_PATH_SCHEMA = {
   },
 } as const;
 
-export function buildLearningPathUserMessage(recurringContext: string): string {
-  return `RECURRING MISTAKES:\n${recurringContext}`;
+export function buildLearningPathUserMessage(
+  recurringContext: string,
+  reviewContext?: string,
+): string {
+  const review = reviewContext ? `\n\nLATEST REVIEW FOCUS (prioritise these):\n${reviewContext}` : '';
+  return `RECURRING MISTAKES:\n${recurringContext}${review}`;
 }
 
 /**

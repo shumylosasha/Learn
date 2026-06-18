@@ -6,6 +6,7 @@ import { Button, Card, Empty, SectionTitle } from '@/components/ui';
 import { categoryColor, colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
+import { useReviews } from '@/store/reviews';
 import { useLessons } from '@/store/lessons';
 import { generateLearningPath } from '@/api/openai';
 import { aggregateRecurringMistakes, recurringMistakesContext } from '@/lib/mistakes';
@@ -14,6 +15,7 @@ import type { Lesson } from '@/types';
 export default function LearnScreen() {
   const router = useRouter();
   const sessions = useSessions((s) => s.sessions);
+  const latestReview = useReviews((s) => s.reviews[0]);
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
   const lessons = useLessons((s) => s.lessons);
@@ -42,10 +44,14 @@ export default function LearnScreen() {
     }
     setBuilding(true);
     try {
+      const reviewContext = latestReview
+        ? `${latestReview.focus.join(', ')}.\n${latestReview.narrative}`
+        : undefined;
       const specs = await generateLearningPath(
         apiKey,
         prefs.analysisModel,
         recurringMistakesContext(recurring, 12),
+        reviewContext,
       );
       if (specs.length === 0) {
         Alert.alert('Nothing to build yet', 'Record a bit more and try again.');
@@ -124,6 +130,7 @@ export default function LearnScreen() {
       />
       <Text style={styles.rebuildHint}>
         Completed lessons stay ticked if they return. New mistakes add new lessons.
+        {latestReview ? ' Weighted by your latest review’s focus.' : ''}
       </Text>
     </ScrollView>
   );
