@@ -14,6 +14,7 @@ import {
   TREND_LABEL,
 } from '@/lib/mistakes';
 import { canReview, generateReview } from '@/lib/review';
+import { computeStreak } from '@/lib/streak';
 import type { MistakeTrend, Review } from '@/types';
 
 export default function ProgressScreen() {
@@ -26,6 +27,7 @@ export default function ProgressScreen() {
   const recurring = useMemo(() => aggregateRecurringMistakes(sessions), [sessions]);
   const byCat = countByCategory(recurring);
   const latestReview = reviews[0];
+  const streak = useMemo(() => computeStreak(sessions), [sessions]);
 
   if (sessions.length === 0) {
     return (
@@ -49,6 +51,8 @@ export default function ProgressScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <StreakCard streak={streak} />
+
       <Card style={styles.statsCard}>
         <Stat value={sessions.length} label="Recordings" />
         <Stat value={recurring.reduce((a, r) => a + r.count, 0)} label="Mistakes" />
@@ -205,6 +209,45 @@ function TrendRow({ trend }: { trend: MistakeTrend }) {
   );
 }
 
+function StreakCard({ streak }: { streak: ReturnType<typeof computeStreak> }) {
+  const { current, best, activeToday, last7 } = streak;
+  const message =
+    current === 0
+      ? 'Record today to start a streak.'
+      : activeToday
+        ? `Practised today — see you tomorrow! Best: ${best} days.`
+        : 'Record today to keep your streak alive.';
+
+  return (
+    <Card style={styles.streakCard}>
+      <View style={styles.streakTop}>
+        <View style={styles.streakCount}>
+          <Text style={styles.streakFire}>{current > 0 ? '🔥' : '✨'}</Text>
+          <Text style={styles.streakNumber}>{current}</Text>
+          <Text style={styles.streakUnit}>day{current === 1 ? '' : 's'}</Text>
+        </View>
+        <View style={styles.dotsRow}>
+          {last7.map((d, i) => (
+            <View key={i} style={styles.dotCol}>
+              <View
+                style={[
+                  styles.dot,
+                  d.active && styles.dotActive,
+                  d.isToday && styles.dotToday,
+                ]}
+              >
+                {d.active && <Text style={styles.dotMark}>🔥</Text>}
+              </View>
+              <Text style={[styles.dotLabel, d.isToday && styles.dotLabelToday]}>{d.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+      <Text style={styles.streakMsg}>{message}</Text>
+    </Card>
+  );
+}
+
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <View style={styles.stat}>
@@ -216,6 +259,30 @@ function Stat({ value, label }: { value: number; label: string }) {
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  streakCard: { gap: spacing.md },
+  streakTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  streakCount: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  streakFire: { fontSize: 26 },
+  streakNumber: { color: colors.text, fontSize: font.h1, fontWeight: '800' },
+  streakUnit: { color: colors.textMuted, fontSize: font.small, fontWeight: '600' },
+  dotsRow: { flexDirection: 'row', gap: 6 },
+  dotCol: { alignItems: 'center', gap: 4 },
+  dot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  dotToday: { borderColor: colors.accent, borderWidth: 2 },
+  dotMark: { fontSize: 11 },
+  dotLabel: { color: colors.textFaint, fontSize: 10, fontWeight: '700' },
+  dotLabelToday: { color: colors.accent },
+  streakMsg: { color: colors.textMuted, fontSize: font.small },
   statsCard: { flexDirection: 'row', justifyContent: 'space-around' },
   stat: { alignItems: 'center', gap: 2 },
   statValue: { color: colors.text, fontSize: font.h1, fontWeight: '800' },

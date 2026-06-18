@@ -29,6 +29,7 @@ import { generateTopic } from '@/api/openai';
 import { useSettings } from '@/store/settings';
 import { useSessions } from '@/store/sessions';
 import { processSession } from '@/lib/pipeline';
+import { computeStreak } from '@/lib/streak';
 
 function tap() {
   if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
@@ -39,6 +40,8 @@ export default function SpeakScreen() {
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
   const createSession = useSessions((s) => s.createSession);
+  const sessions = useSessions((s) => s.sessions);
+  const streak = computeStreak(sessions);
 
   const [topic, setTopic] = useState(randomTopic());
   const [recording, setRecording] = useState(false);
@@ -131,6 +134,15 @@ export default function SpeakScreen() {
             <Text style={styles.warnText}>Add your OpenAI API key in Settings to begin.</Text>
           </View>
         </Pressable>
+      )}
+
+      {streak.current > 0 && (
+        <View style={styles.streakChip}>
+          <Text style={styles.streakChipText}>🔥 {streak.current}-day streak</Text>
+          {!streak.activeToday && (
+            <Text style={styles.streakChipSub}>· record today to keep it</Text>
+          )}
+        </View>
       )}
 
       <SectionTitle>Your speaking topic</SectionTitle>
@@ -382,6 +394,18 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   warnText: { color: colors.warning, fontSize: font.small, flex: 1 },
+  streakChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+  },
+  streakChipText: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
+  streakChipSub: { color: colors.textMuted, fontSize: font.tiny },
   topicText: { color: colors.text, fontSize: font.h3, lineHeight: 26, fontWeight: '600' },
   topicActions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   toolButton: {
