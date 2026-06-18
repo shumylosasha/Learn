@@ -10,7 +10,7 @@ export default function TabsLayout() {
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '800', fontSize: 20 },
         headerShadowVisible: false,
-        tabBarActiveTintColor: colors.success,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textFaint,
         tabBarStyle: {
           backgroundColor: colors.surface,

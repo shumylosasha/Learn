@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   waveBar: {
     width: 4,
     borderRadius: 2,
-    backgroundColor: colors.success,
+    backgroundColor: colors.accent,
   },
   recordButton: {
     width: 132,

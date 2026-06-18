@@ -1,20 +1,20 @@
-// A small, calm design system. British-racing-green accent for character.
+// A clean, light design system. Off-white canvas, near-black text, indigo accent.
 
 export const colors = {
-  bg: '#0E1311',
-  surface: '#18201D',
-  surfaceAlt: '#212B27',
-  border: '#2C3833',
-  text: '#F2F5F3',
-  textMuted: '#9BA8A2',
-  textFaint: '#69756F',
-  accent: '#1F6F54', // British racing green
-  accentSoft: '#234A3C',
-  accentText: '#EAFBF4',
-  danger: '#E0685B',
-  warning: '#E0B15B',
-  success: '#5BC08A',
-  user: '#234A3C',
+  bg: '#F6F7F9', // app canvas — soft off-white
+  surface: '#FFFFFF', // cards
+  surfaceAlt: '#EDF0F4', // pills, alt rows, subtle fills
+  border: '#E3E7ED',
+  text: '#111827', // near-black slate
+  textMuted: '#5C6672',
+  textFaint: '#98A1AE',
+  accent: '#4F46E5', // indigo
+  accentSoft: '#E5E9FD', // light indigo (chat bubbles, soft fills)
+  accentText: '#FFFFFF', // text/icons on the accent colour
+  danger: '#DC2626',
+  warning: '#B45309',
+  success: '#059669',
+  user: '#E5E9FD',
 };
 
 export const severityColor = (severity: number) => {
@@ -28,7 +28,7 @@ export const trendColor = (status: string) => {
     case 'resolved':
       return colors.success;
     case 'improved':
-      return '#7FC8A0';
+      return '#10B981';
     case 'persistent':
       return colors.textMuted;
     case 'worse':
@@ -43,11 +43,11 @@ export const trendColor = (status: string) => {
 export const categoryColor = (category: string) => {
   switch (category) {
     case 'grammar':
-      return '#6FA8E0';
+      return '#2563EB';
     case 'vocabulary':
-      return '#C08AE0';
+      return '#7C3AED';
     case 'register':
-      return '#E0B15B';
+      return '#B45309';
     default:
       return colors.textMuted;
   }
