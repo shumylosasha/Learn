@@ -5,7 +5,10 @@ import {
   ANALYSIS_SCHEMA,
   ANALYSIS_SYSTEM_PROMPT,
   buildAnalysisUserMessage,
+  buildLearningPathUserMessage,
   buildReviewUserMessage,
+  LEARNING_PATH_SCHEMA,
+  LEARNING_PATH_SYSTEM_PROMPT,
   REVIEW_SCHEMA,
   REVIEW_SYSTEM_PROMPT,
   TOPIC_GENERATION_PROMPT,
@@ -125,6 +128,31 @@ export async function generateReviewPlan(
     REVIEW_SCHEMA,
   );
   return JSON.parse(content) as ReviewPlan;
+}
+
+export interface LessonSpec {
+  title: string;
+  area: string;
+  category: 'grammar' | 'vocabulary' | 'register';
+  summary: string;
+  basedOnTypes: string[];
+}
+
+/** Generate a prioritised learning path of micro-lessons from recurring mistakes. */
+export async function generateLearningPath(
+  apiKey: string,
+  model: string,
+  recurringContext: string,
+): Promise<LessonSpec[]> {
+  const content = await structuredCompletion(
+    apiKey,
+    model,
+    LEARNING_PATH_SYSTEM_PROMPT,
+    buildLearningPathUserMessage(recurringContext),
+    LEARNING_PATH_SCHEMA,
+  );
+  const parsed = JSON.parse(content) as { lessons?: LessonSpec[] };
+  return parsed.lessons ?? [];
 }
 
 async function structuredCompletion(

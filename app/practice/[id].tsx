@@ -21,13 +21,18 @@ import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
 import { useReviews } from '@/store/reviews';
 import { GLOBAL_PRACTICE_ID, usePractice } from '@/store/practice';
+import { useLessons } from '@/store/lessons';
 import { chatComplete, synthesizeSpeech, type ChatMessageInput } from '@/api/openai';
-import { practiceSystemPrompt, recordingPracticeSystemPrompt } from '@/api/prompts';
+import {
+  lessonSystemPrompt,
+  practiceSystemPrompt,
+  recordingPracticeSystemPrompt,
+} from '@/api/prompts';
 import { aggregateRecurringMistakes, recurringMistakesContext } from '@/lib/mistakes';
 import { playBase64Mp3 } from '@/lib/audio';
 import type { ChatMessage, Mistake } from '@/types';
 
-const COMPLETE_MARKER = /session complete/i;
+const COMPLETE_MARKER = /\b(lesson|session|drill)\s+complete\b/i;
 
 function recordingMistakesContext(mistakes: Mistake[]): string {
   return mistakes
@@ -45,11 +50,14 @@ function uid() {
 export default function PracticeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const threadId = id ?? GLOBAL_PRACTICE_ID;
-  const isRecording = threadId !== GLOBAL_PRACTICE_ID;
   const router = useRouter();
 
   const allSessions = useSessions((s) => s.sessions);
   const session = useSessions((s) => s.sessions.find((x) => x.id === threadId));
+  const lesson = useLessons((s) => s.lessons.find((l) => l.id === threadId));
+  const lessonsLoaded = useLessons((s) => s.loaded);
+  const loadLessons = useLessons((s) => s.load);
+  const markLessonComplete = useLessons((s) => s.markComplete);
   const latestReview = useReviews((s) => s.reviews[0]);
   const messages = usePractice((s) => s.threads[threadId] ?? []);
   const loaded = usePractice((s) => s.loaded[threadId]);
@@ -59,23 +67,41 @@ export default function PracticeScreen() {
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
 
+  const isLesson = !!lesson;
+  const isRecordingSession = !isLesson && threadId !== GLOBAL_PRACTICE_ID && !!session;
+  const finite = isLesson || isRecordingSession; // these sessions can "complete"
+  // The relevant resource is resolved (or known-absent) so we can pick a prompt.
+  const resourceReady =
+    threadId === GLOBAL_PRACTICE_ID || isLesson || isRecordingSession || lessonsLoaded;
+
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
   const kickedOff = useRef(false);
 
-  // A recording drill is "complete" once the tutor posts the completion marker.
+  // A finite session is "complete" once the tutor posts the completion marker.
   const lastMsg = messages[messages.length - 1];
   const complete =
-    isRecording && lastMsg?.role === 'assistant' && COMPLETE_MARKER.test(lastMsg.content);
+    finite && lastMsg?.role === 'assistant' && COMPLETE_MARKER.test(lastMsg.content);
 
   useEffect(() => {
     load(threadId);
-  }, [threadId, load]);
+    loadLessons();
+  }, [threadId, load, loadLessons]);
+
+  // When a lesson's chat reaches completion, tick it off in the learning path.
+  useEffect(() => {
+    if (complete && lesson && lesson.status !== 'completed') {
+      markLessonComplete(lesson.id);
+    }
+  }, [complete, lesson, markLessonComplete]);
 
   const systemPrompt = (): string => {
-    if (isRecording && session?.analysis) {
+    if (isLesson && lesson) {
+      return lessonSystemPrompt(lesson.title, lesson.area, lesson.basedOnTypes);
+    }
+    if (isRecordingSession && session?.analysis) {
       const mistakes = session.analysis.mistakes;
       return recordingPracticeSystemPrompt(
         session.topic,
@@ -125,11 +151,11 @@ export default function PracticeScreen() {
 
   // Kick off the tutor's opening message once the thread is loaded and empty.
   useEffect(() => {
-    if (loaded && !kickedOff.current && messages.length === 0 && apiKey) {
+    if (loaded && resourceReady && !kickedOff.current && messages.length === 0 && apiKey) {
       kickedOff.current = true;
       send('');
     }
-  }, [loaded, messages.length, apiKey]);
+  }, [loaded, resourceReady, messages.length, apiKey]);
 
   const onSend = () => {
     const text = input.trim();
@@ -158,7 +184,7 @@ export default function PracticeScreen() {
     >
       <Stack.Screen
         options={{
-          title: isRecording ? 'Recording practice' : 'Practice',
+          title: isLesson ? 'Lesson' : isRecordingSession ? 'Recording practice' : 'Practice',
           headerRight: () => (
             <Pressable onPress={onReset} hitSlop={10}>
               <Ionicons name="refresh" size={20} color={colors.textMuted} />
@@ -181,9 +207,11 @@ export default function PracticeScreen() {
               <View style={styles.resumeHint}>
                 <Ionicons name="bookmark-outline" size={13} color={colors.textFaint} />
                 <Text style={styles.resumeHintText}>
-                  {isRecording
-                    ? 'A focused drill on this recording. Saved if you leave.'
-                    : 'Ongoing weak-spots tutor. Saved automatically — resume anytime.'}
+                  {isLesson
+                    ? 'A guided lesson: a little theory, then practice. Saved if you leave.'
+                    : isRecordingSession
+                      ? 'A focused drill on this recording. Saved if you leave.'
+                      : 'Ongoing weak-spots tutor. Saved automatically — resume anytime.'}
                 </Text>
               </View>
             )}
@@ -218,7 +246,9 @@ export default function PracticeScreen() {
             <View style={styles.doneBar}>
               <View style={styles.doneRow}>
                 <Ionicons name="checkmark-circle" size={22} color={colors.success} />
-                <Text style={styles.doneText}>Drill complete — nice work.</Text>
+                <Text style={styles.doneText}>
+                  {isLesson ? 'Lesson complete — nice work.' : 'Drill complete — nice work.'}
+                </Text>
               </View>
               <View style={styles.doneActions}>
                 <Button

@@ -60,13 +60,13 @@ export default function ProgressScreen() {
       </Card>
 
       <Pressable
-        onPress={() => router.push('/practice/weakspots')}
+        onPress={() => router.push('/learn')}
         style={({ pressed }) => [styles.practiceCta, pressed && { opacity: 0.9 }]}
       >
-        <Ionicons name="barbell" size={20} color={colors.accentText} />
+        <Ionicons name="school" size={20} color={colors.accentText} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.practiceCtaTitle}>Practise weak spots</Text>
-          <Text style={styles.practiceCtaSub}>Chat tutor drills your recurring mistakes</Text>
+          <Text style={styles.practiceCtaTitle}>Your learning path</Text>
+          <Text style={styles.practiceCtaSub}>Lessons + free practice from your mistakes</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.accentText} />
       </Pressable>

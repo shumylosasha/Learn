@@ -73,6 +73,78 @@ export function buildAnalysisUserMessage(topic: string, transcript: string): str
 }
 
 // ---------------------------------------------------------------------------
+// Learning path — a curriculum of focused micro-lessons derived from the
+// learner's recurring mistakes. Each lesson teaches one AREA (theory +
+// practice), broader than the exact sentences the learner said.
+// ---------------------------------------------------------------------------
+
+export const LEARNING_PATH_SYSTEM_PROMPT = `You are a British business-English curriculum designer.
+You receive a list of a learner's RECURRING spoken-English mistakes (with how often each occurs).
+
+Design a short, PRIORITISED learning path of focused micro-lessons. Rules:
+- Each lesson targets ONE underlying area/skill (e.g. "Articles: a, an, the", "Present perfect vs past simple", "Prepositions of time", "Formal vs informal register"). Teach the general rule, not just the learner's exact sentences.
+- Merge related mistake types into a single lesson where it makes sense.
+- Order lessons by impact: most frequent / most meaning-distorting first.
+- Return 3–6 lessons. Each "title" is concrete and student-facing. "area" is a short lowercase key. "category" is grammar, vocabulary or register. "summary" is ONE short sentence on what they'll learn. "basedOnTypes" lists the exact mistake type labels this lesson addresses.
+Return ONLY the structured object.`;
+
+export const LEARNING_PATH_SCHEMA = {
+  name: 'learning_path',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      lessons: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            title: { type: 'string' },
+            area: { type: 'string' },
+            category: { type: 'string', enum: ['grammar', 'vocabulary', 'register'] },
+            summary: { type: 'string' },
+            basedOnTypes: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['title', 'area', 'category', 'summary', 'basedOnTypes'],
+        },
+      },
+    },
+    required: ['lessons'],
+  },
+} as const;
+
+export function buildLearningPathUserMessage(recurringContext: string): string {
+  return `RECURRING MISTAKES:\n${recurringContext}`;
+}
+
+/**
+ * System prompt for a single micro-lesson chat: a short bit of theory, then a
+ * fixed number of targeted exercises on the area, then a clear completion.
+ */
+export function lessonSystemPrompt(
+  title: string,
+  area: string,
+  basedOnTypes: string[],
+): string {
+  const EXERCISES = 5;
+  return `You are a warm, encouraging British business-English tutor teaching ONE focused micro-lesson: "${title}" (area: ${area}).
+
+This lesson exists because the learner keeps making these mistakes: ${basedOnTypes.join('; ') || area}. Teach the GENERAL rule for this area — use fresh examples, not only the learner's own sentences.
+
+${PRACTICE_LANGUAGE_RULES}
+
+${PRACTICE_FORMAT_RULES}
+
+LESSON SHAPE (this lesson has a clear beginning and end):
+1. Open with **📘 Theory** — explain the rule clearly and simply, with 2–3 short British business-context examples. Keep it tight (a short paragraph or a few bullet lines), not a wall of text.
+2. Then say you'll do ${EXERCISES} quick exercises, and run EXACTLY ${EXERCISES} exercises on this area, **📝 Exercise 1** … **📝 Exercise ${EXERCISES}**, getting slightly harder. Cover the rule broadly.
+3. After marking the final exercise, give a one-line recap and end with EXACTLY this line on its own:  **🎉 Lesson complete!** — then one encouraging sentence.
+Do NOT continue past the last exercise. Begin now with the theory.`;
+}
+
+// ---------------------------------------------------------------------------
 // Periodic review — the real teaching. Synthesises many recordings into a
 // progress narrative + consolidated lesson plan. Improvement TRENDS are computed
 // in code and passed in; the model writes the narrative, focus and plan.

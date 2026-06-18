@@ -52,6 +52,26 @@ export interface LessonStep {
   exercises: Exercise[];
 }
 
+export type LessonStatus = 'available' | 'completed';
+
+/**
+ * A focused micro-lesson in the learner's curriculum, generated from their
+ * recurring mistakes. Teaches ONE area (e.g. articles) with a bit of theory
+ * then targeted practice — broader than only the sentences the learner said.
+ */
+export interface Lesson {
+  id: string;
+  title: string; // "Articles: a, an, the"
+  area: string; // short area name/key, e.g. "articles"
+  category: MistakeCategory;
+  summary: string; // one-line description of what it covers
+  /** The recurring mistake TYPES this lesson targets. */
+  basedOnTypes: string[];
+  status: LessonStatus;
+  createdAt: number;
+  completedAt?: number;
+}
+
 export type SessionStatus =
   | 'recorded'
   | 'transcribing'
