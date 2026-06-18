@@ -1,6 +1,13 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useUsage } from '@/store/usage';
 import type { LessonStep, SessionAnalysis } from '@/types';
+
+function recordChatUsage(model: string, usage: unknown) {
+  const u = usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  if (!u) return;
+  useUsage.getState().recordChat(model, u.prompt_tokens ?? 0, u.completion_tokens ?? 0);
+}
 import {
   ANALYSIS_SCHEMA,
   ANALYSIS_SYSTEM_PROMPT,
@@ -41,7 +48,10 @@ export async function transcribeAudio(
   apiKey: string,
   audioUri: string,
   model: string,
+  durationMs = 0,
 ): Promise<string> {
+  // Record usage by audio length (transcription is billed per minute).
+  if (durationMs > 0) useUsage.getState().recordTranscription(model, durationMs / 1000);
   // On native, RN's own FormData multipart encoder rejects file-URI parts under
   // the new architecture ("Unsupported FormData part implementation"). Expo's
   // native uploader streams the file directly and is the reliable path.
@@ -177,6 +187,7 @@ async function structuredCompletion(
 
   if (!res.ok) throw new OpenAIError(await readError(res));
   const data = await res.json();
+  recordChatUsage(model, data.usage);
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new OpenAIError('Model returned no content.');
   return content;
@@ -196,6 +207,7 @@ export async function chatComplete(
 
   if (!res.ok) throw new OpenAIError(`Chat failed: ${await readError(res)}`);
   const data = await res.json();
+  recordChatUsage(model, data.usage);
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new OpenAIError('Chat returned no content.');
   return content.trim();
@@ -221,6 +233,7 @@ export async function synthesizeSpeech(
   model: string,
   voice: string,
 ): Promise<string> {
+  useUsage.getState().recordTts(model, text.length);
   const res = await fetch(`${BASE}/audio/speech`, {
     method: 'POST',
     headers: { ...authHeaders(apiKey), 'Content-Type': 'application/json' },

@@ -5,9 +5,13 @@ import { Button, Card, Label, SectionTitle } from '@/components/ui';
 import { colors, font, radius, spacing } from '@/theme';
 import { DEFAULT_PREFS, TTS_VOICES, useSettings } from '@/store/settings';
 import { chatComplete } from '@/api/openai';
+import { summarizeUsage, useUsage } from '@/store/usage';
+import { formatUsd } from '@/lib/pricing';
 
 export default function SettingsScreen() {
   const { apiKey, prefs, setApiKey, clearApiKey, setPrefs, loaded } = useSettings();
+  const usage = useUsage();
+  const loadUsage = useUsage((s) => s.load);
   const [keyInput, setKeyInput] = useState('');
   const [testing, setTesting] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -15,6 +19,19 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (loaded && apiKey) setKeyInput(apiKey);
   }, [loaded, apiKey]);
+
+  useEffect(() => {
+    loadUsage();
+  }, [loadUsage]);
+
+  const summary = summarizeUsage(usage);
+
+  const resetUsage = () => {
+    Alert.alert('Reset usage counter?', 'This only clears the in-app estimate.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reset', style: 'destructive', onPress: () => usage.reset() },
+    ]);
+  };
 
   const saveKey = async () => {
     const k = keyInput.trim();
@@ -182,11 +199,65 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
+      <View>
+        <SectionTitle>Usage & estimated cost</SectionTitle>
+        <Card style={{ gap: spacing.md }}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Estimated spent so far</Text>
+            <Text style={styles.totalValue}>{formatUsd(summary.totalCost)}</Text>
+          </View>
+
+          <UsageRow
+            label="Analysis & tutor"
+            detail={`${formatTokens(summary.chatTokens)} tokens`}
+            cost={summary.chatCost}
+          />
+          <UsageRow
+            label="Transcription"
+            detail={`${summary.transcriptionMinutes.toFixed(1)} min`}
+            cost={summary.transcriptionCost}
+          />
+          <UsageRow
+            label="Speech (TTS)"
+            detail={`${formatTokens(summary.ttsChars)} chars`}
+            cost={summary.ttsCost}
+          />
+
+          <Pressable onPress={() => Linking.openURL('https://platform.openai.com/usage')}>
+            <Text style={styles.link}>See exact billing at platform.openai.com/usage →</Text>
+          </Pressable>
+          <Text style={styles.note}>
+            A rough on-device estimate from current public OpenAI prices — it can drift from your
+            actual bill (which is the authoritative figure). Counted since you installed the app on
+            this device.
+          </Text>
+          {summary.totalCost > 0 ? (
+            <Button title="Reset counter" variant="secondary" onPress={resetUsage} />
+          ) : null}
+        </Card>
+      </View>
+
       <Text style={styles.about}>
         Business English Coach · Speak → capture → weekly review → targeted practice. Built for
         British business English.
       </Text>
     </ScrollView>
+  );
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return `${n}`;
+}
+
+function UsageRow({ label, detail, cost }: { label: string; detail: string; cost: number }) {
+  return (
+    <View style={styles.usageRow}>
+      <Text style={styles.usageLabel}>{label}</Text>
+      <Text style={styles.usageDetail}>{detail}</Text>
+      <Text style={styles.usageCost}>{formatUsd(cost)}</Text>
+    </View>
   );
 }
 
@@ -246,4 +317,15 @@ const styles = StyleSheet.create({
   },
   voiceText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
   about: { color: colors.textFaint, fontSize: font.tiny, textAlign: 'center', lineHeight: 18 },
+  totalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  totalLabel: { color: colors.textMuted, fontSize: font.small },
+  totalValue: { color: colors.text, fontSize: font.h2, fontWeight: '800' },
+  usageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  usageLabel: { color: colors.text, fontSize: font.small, flex: 1 },
+  usageDetail: { color: colors.textFaint, fontSize: font.tiny },
+  usageCost: { color: colors.textMuted, fontSize: font.small, fontWeight: '700', minWidth: 56, textAlign: 'right' },
 });

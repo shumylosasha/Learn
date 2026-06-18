@@ -30,6 +30,7 @@ export async function processSession(sessionId: string): Promise<void> {
       apiKey,
       session.audioUri,
       prefs.transcriptionModel,
+      session.durationMs,
     );
 
     if (!transcript) {
