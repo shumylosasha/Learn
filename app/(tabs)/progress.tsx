@@ -64,9 +64,22 @@ export default function ProgressScreen() {
         <Stat value={reviews.length} label="Reviews" />
       </Card>
 
+      <Pressable
+        onPress={() => router.push('/practice/weakspots')}
+        style={({ pressed }) => [styles.practiceCta, pressed && { opacity: 0.9 }]}
+      >
+        <Ionicons name="barbell" size={20} color={colors.accentText} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.practiceCtaTitle}>Practise weak spots</Text>
+          <Text style={styles.practiceCtaSub}>Chat tutor drills your recurring mistakes</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.accentText} />
+      </Pressable>
+
       <Button
         title={generating ? 'Reviewing your progress…' : 'Review now'}
         onPress={onReviewNow}
+        variant="secondary"
         loading={generating}
         disabled={!reviewable && !generating}
       />
@@ -128,6 +141,8 @@ export default function ProgressScreen() {
           </View>
         </View>
       )}
+
+      <View style={styles.divider} />
 
       <SessionHistory sessions={sessions} onOpen={(id) => router.push(`/session/${id}`)} onDelete={confirmDelete} />
     </ScrollView>
@@ -292,6 +307,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   hintCenter: { color: colors.textFaint, fontSize: font.tiny, textAlign: 'center' },
+  practiceCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    padding: spacing.md + 2,
+  },
+  practiceCtaTitle: { color: colors.accentText, fontSize: font.body, fontWeight: '800' },
+  practiceCtaSub: { color: colors.accentText, fontSize: font.tiny, opacity: 0.85, marginTop: 1 },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
   catRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   recHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   catDot: { width: 8, height: 8, borderRadius: 4 },

@@ -15,6 +15,7 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { AudioPlayer } from 'expo-audio';
 import { Empty } from '@/components/ui';
+import { MarkdownText, parseOptions } from '@/components/Markdown';
 import { colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
@@ -136,18 +137,34 @@ export default function PracticeScreen() {
             contentContainerStyle={styles.chat}
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
+            {messages.length > 0 && (
+              <View style={styles.resumeHint}>
+                <Ionicons name="bookmark-outline" size={13} color={colors.textFaint} />
+                <Text style={styles.resumeHintText}>
+                  Saved automatically. Leave anytime — tap ↺ to start a new session.
+                </Text>
+              </View>
+            )}
             {messages.length === 0 && sending && (
               <Text style={styles.warming}>Your tutor is getting ready…</Text>
             )}
-            {messages.map((m) => (
-              <Bubble
-                key={m.id}
-                message={m}
-                ttsModel={prefs.ttsModel}
-                voice={prefs.ttsVoice}
-                apiKey={apiKey}
-              />
-            ))}
+            {messages.map((m, i) => {
+              const isLast = i === messages.length - 1;
+              return (
+                <Bubble
+                  key={m.id}
+                  message={m}
+                  ttsModel={prefs.ttsModel}
+                  voice={prefs.ttsVoice}
+                  apiKey={apiKey}
+                  // Only the latest tutor turn offers tappable answer chips.
+                  interactive={isLast && m.role === 'assistant' && !sending}
+                  onSelectOption={(label) => {
+                    if (!sending) send(label);
+                  }}
+                />
+              );
+            })}
             {sending && messages.length > 0 && (
               <View style={[styles.bubble, styles.assistant]}>
                 <ActivityIndicator color={colors.textMuted} />
@@ -184,11 +201,15 @@ function Bubble({
   ttsModel,
   voice,
   apiKey,
+  interactive,
+  onSelectOption,
 }: {
   message: ChatMessage;
   ttsModel: string;
   voice: string;
   apiKey: string;
+  interactive?: boolean;
+  onSelectOption?: (label: string) => void;
 }) {
   const isUser = message.role === 'user';
   const [loadingTts, setLoadingTts] = useState(false);
@@ -212,17 +233,38 @@ function Bubble({
     }
   };
 
+  const options = !isUser && interactive ? parseOptions(message.content) : [];
+
   return (
-    <View style={[styles.bubble, isUser ? styles.user : styles.assistant]}>
-      <Text style={styles.bubbleText}>{message.content}</Text>
-      {!isUser && (
-        <Pressable onPress={speak} style={styles.speakBtn} hitSlop={8}>
-          {loadingTts ? (
-            <ActivityIndicator size="small" color={colors.textFaint} />
-          ) : (
-            <Ionicons name="volume-medium-outline" size={16} color={colors.textFaint} />
-          )}
-        </Pressable>
+    <View style={styles.bubbleWrap}>
+      <View style={[styles.bubble, isUser ? styles.user : styles.assistant]}>
+        <MarkdownText content={message.content} style={styles.bubbleText} />
+        {!isUser && (
+          <Pressable onPress={speak} style={styles.speakBtn} hitSlop={8}>
+            {loadingTts ? (
+              <ActivityIndicator size="small" color={colors.textFaint} />
+            ) : (
+              <Ionicons name="volume-medium-outline" size={16} color={colors.textFaint} />
+            )}
+          </Pressable>
+        )}
+      </View>
+
+      {options.length > 0 && (
+        <View style={styles.options}>
+          {options.map((opt) => (
+            <Pressable
+              key={opt.letter}
+              onPress={() => onSelectOption?.(`${opt.letter}) ${opt.text}`)}
+              style={({ pressed }) => [styles.optionChip, pressed && styles.optionChipPressed]}
+            >
+              <Text style={styles.optionLetter}>{opt.letter}</Text>
+              <Text style={styles.optionText} numberOfLines={2}>
+                {opt.text}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -231,6 +273,15 @@ function Bubble({
 const styles = StyleSheet.create({
   chat: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   warming: { color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
+  resumeHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingBottom: spacing.xs,
+  },
+  resumeHintText: { color: colors.textFaint, fontSize: font.tiny },
+  bubbleWrap: { gap: spacing.sm },
   bubble: { maxWidth: '88%', borderRadius: radius.lg, padding: spacing.md },
   user: { alignSelf: 'flex-end', backgroundColor: colors.accentSoft, borderBottomRightRadius: 4 },
   assistant: {
@@ -242,6 +293,32 @@ const styles = StyleSheet.create({
   },
   bubbleText: { color: colors.text, fontSize: font.body, lineHeight: 23 },
   speakBtn: { marginTop: spacing.sm, alignSelf: 'flex-start' },
+  options: { gap: spacing.sm, alignSelf: 'stretch' },
+  optionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+  },
+  optionChipPressed: { backgroundColor: colors.accentSoft },
+  optionLetter: {
+    color: colors.accentText,
+    backgroundColor: colors.accent,
+    fontSize: font.tiny,
+    fontWeight: '800',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    textAlign: 'center',
+    lineHeight: 22,
+    overflow: 'hidden',
+  },
+  optionText: { color: colors.text, fontSize: font.small, fontWeight: '600', flex: 1 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
