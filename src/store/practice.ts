@@ -2,51 +2,57 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChatMessage } from '@/types';
 
-// A single, ongoing "practise my weak spots" chat thread that isn't tied to one
-// recording — it draws on the cumulative weak spots and the latest review.
-const KEY = 'weakspots_practice_v1';
+// Practice threads are keyed by id:
+//   'weakspots'      → the ongoing, global weak-spots tutor (never "completes")
+//   <a session id>   → a finite drill on one recording's mistakes (can complete)
+const keyFor = (id: string) => `practice_v2_${id}`;
+
+/** The id of the single global/ongoing practice thread. */
+export const GLOBAL_PRACTICE_ID = 'weakspots';
 
 interface PracticeState {
-  messages: ChatMessage[];
-  loaded: boolean;
-  load: () => Promise<void>;
-  append: (m: ChatMessage) => void;
-  reset: () => void;
+  threads: Record<string, ChatMessage[]>;
+  loaded: Record<string, boolean>;
+  load: (id: string) => Promise<void>;
+  append: (id: string, m: ChatMessage) => void;
+  reset: (id: string) => void;
 }
 
-async function persist(messages: ChatMessage[]) {
+async function persist(id: string, messages: ChatMessage[]) {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(messages));
+    await AsyncStorage.setItem(keyFor(id), JSON.stringify(messages));
   } catch {
     /* best effort */
   }
 }
 
 export const usePractice = create<PracticeState>((set, get) => ({
-  messages: [],
-  loaded: false,
+  threads: {},
+  loaded: {},
 
-  load: async () => {
-    const raw = await AsyncStorage.getItem(KEY);
+  load: async (id: string) => {
+    if (get().loaded[id]) return;
     let messages: ChatMessage[] = [];
-    if (raw) {
-      try {
-        messages = JSON.parse(raw);
-      } catch {
-        messages = [];
-      }
+    try {
+      const raw = await AsyncStorage.getItem(keyFor(id));
+      if (raw) messages = JSON.parse(raw);
+    } catch {
+      messages = [];
     }
-    set({ messages, loaded: true });
+    set((s) => ({
+      threads: { ...s.threads, [id]: messages },
+      loaded: { ...s.loaded, [id]: true },
+    }));
   },
 
-  append: (m: ChatMessage) => {
-    const messages = [...get().messages, m];
-    set({ messages });
-    persist(messages);
+  append: (id: string, m: ChatMessage) => {
+    const messages = [...(get().threads[id] ?? []), m];
+    set((s) => ({ threads: { ...s.threads, [id]: messages } }));
+    persist(id, messages);
   },
 
-  reset: () => {
-    set({ messages: [] });
-    persist([]);
+  reset: (id: string) => {
+    set((s) => ({ threads: { ...s.threads, [id]: [] } }));
+    persist(id, []);
   },
 }));

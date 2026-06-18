@@ -11,30 +11,49 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { AudioPlayer } from 'expo-audio';
-import { Empty } from '@/components/ui';
+import { Button, Empty } from '@/components/ui';
 import { MarkdownText, parseOptions } from '@/components/Markdown';
 import { colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
 import { useReviews } from '@/store/reviews';
-import { usePractice } from '@/store/practice';
+import { GLOBAL_PRACTICE_ID, usePractice } from '@/store/practice';
 import { chatComplete, synthesizeSpeech, type ChatMessageInput } from '@/api/openai';
-import { practiceSystemPrompt } from '@/api/prompts';
+import { practiceSystemPrompt, recordingPracticeSystemPrompt } from '@/api/prompts';
 import { aggregateRecurringMistakes, recurringMistakesContext } from '@/lib/mistakes';
 import { playBase64Mp3 } from '@/lib/audio';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, Mistake } from '@/types';
+
+const COMPLETE_MARKER = /session complete/i;
+
+function recordingMistakesContext(mistakes: Mistake[]): string {
+  return mistakes
+    .map(
+      (m, i) =>
+        `${i + 1}. [${m.category}] ${m.type} — you said "${m.quote}" → "${m.correction}". ${m.explanation}`,
+    )
+    .join('\n');
+}
 
 function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 export default function PracticeScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const threadId = id ?? GLOBAL_PRACTICE_ID;
+  const isRecording = threadId !== GLOBAL_PRACTICE_ID;
+  const router = useRouter();
+
   const allSessions = useSessions((s) => s.sessions);
+  const session = useSessions((s) => s.sessions.find((x) => x.id === threadId));
   const latestReview = useReviews((s) => s.reviews[0]);
-  const messages = usePractice((s) => s.messages);
+  const messages = usePractice((s) => s.threads[threadId] ?? []);
+  const loaded = usePractice((s) => s.loaded[threadId]);
+  const load = usePractice((s) => s.load);
   const append = usePractice((s) => s.append);
   const reset = usePractice((s) => s.reset);
   const apiKey = useSettings((s) => s.apiKey);
@@ -43,9 +62,27 @@ export default function PracticeScreen() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
   const kickedOff = useRef(false);
 
+  // A recording drill is "complete" once the tutor posts the completion marker.
+  const lastMsg = messages[messages.length - 1];
+  const complete =
+    isRecording && lastMsg?.role === 'assistant' && COMPLETE_MARKER.test(lastMsg.content);
+
+  useEffect(() => {
+    load(threadId);
+  }, [threadId, load]);
+
   const systemPrompt = (): string => {
+    if (isRecording && session?.analysis) {
+      const mistakes = session.analysis.mistakes;
+      return recordingPracticeSystemPrompt(
+        session.topic,
+        recordingMistakesContext(mistakes),
+        mistakes.length,
+      );
+    }
     const weakSpots = recurringMistakesContext(aggregateRecurringMistakes(allSessions));
     const planContext = latestReview
       ? `Focus areas: ${latestReview.focus.join(', ')}.\n` +
@@ -65,13 +102,13 @@ export default function PracticeScreen() {
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ];
       if (text) {
-        append({ id: uid(), role: 'user', content: text, createdAt: Date.now() });
+        append(threadId, { id: uid(), role: 'user', content: text, createdAt: Date.now() });
         history.push({ role: 'user', content: text });
       }
       const reply = await chatComplete(apiKey, history, prefs.analysisModel);
-      append({ id: uid(), role: 'assistant', content: reply, createdAt: Date.now() });
+      append(threadId, { id: uid(), role: 'assistant', content: reply, createdAt: Date.now() });
     } catch (e) {
-      append({
+      append(threadId, {
         id: uid(),
         role: 'assistant',
         content: `⚠️ ${e instanceof Error ? e.message : 'Something went wrong.'}`,
@@ -79,17 +116,20 @@ export default function PracticeScreen() {
       });
     } finally {
       setSending(false);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+        if (!complete) inputRef.current?.focus(); // keep the keyboard up between turns
+      }, 100);
     }
   };
 
-  // Kick off the tutor's opening message once, if the thread is empty.
+  // Kick off the tutor's opening message once the thread is loaded and empty.
   useEffect(() => {
-    if (!kickedOff.current && messages.length === 0 && apiKey) {
+    if (loaded && !kickedOff.current && messages.length === 0 && apiKey) {
       kickedOff.current = true;
       send('');
     }
-  }, [messages.length, apiKey]);
+  }, [loaded, messages.length, apiKey]);
 
   const onSend = () => {
     const text = input.trim();
@@ -98,17 +138,15 @@ export default function PracticeScreen() {
     send(text);
   };
 
+  const restart = () => {
+    reset(threadId);
+    kickedOff.current = false;
+  };
+
   const onReset = () => {
     Alert.alert('Start fresh?', 'This clears the current practice conversation.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reset',
-        style: 'destructive',
-        onPress: () => {
-          reset();
-          kickedOff.current = false;
-        },
-      },
+      { text: 'Reset', style: 'destructive', onPress: restart },
     ]);
   };
 
@@ -120,7 +158,7 @@ export default function PracticeScreen() {
     >
       <Stack.Screen
         options={{
-          title: 'Practice',
+          title: isRecording ? 'Recording practice' : 'Practice',
           headerRight: () => (
             <Pressable onPress={onReset} hitSlop={10}>
               <Ionicons name="refresh" size={20} color={colors.textMuted} />
@@ -135,13 +173,17 @@ export default function PracticeScreen() {
           <ScrollView
             ref={scrollRef}
             contentContainerStyle={styles.chat}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
             {messages.length > 0 && (
               <View style={styles.resumeHint}>
                 <Ionicons name="bookmark-outline" size={13} color={colors.textFaint} />
                 <Text style={styles.resumeHintText}>
-                  Saved automatically. Leave anytime — tap ↺ to start a new session.
+                  {isRecording
+                    ? 'A focused drill on this recording. Saved if you leave.'
+                    : 'Ongoing weak-spots tutor. Saved automatically — resume anytime.'}
                 </Text>
               </View>
             )}
@@ -172,24 +214,45 @@ export default function PracticeScreen() {
             )}
           </ScrollView>
 
-          <View style={styles.inputBar}>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Type your answer…"
-              placeholderTextColor={colors.textFaint}
-              multiline
-              onSubmitEditing={onSend}
-            />
-            <Pressable
-              onPress={onSend}
-              disabled={!input.trim() || sending}
-              style={[styles.sendBtn, { opacity: !input.trim() || sending ? 0.4 : 1 }]}
-            >
-              <Ionicons name="arrow-up" size={22} color={colors.accentText} />
-            </Pressable>
-          </View>
+          {complete ? (
+            <View style={styles.doneBar}>
+              <View style={styles.doneRow}>
+                <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+                <Text style={styles.doneText}>Drill complete — nice work.</Text>
+              </View>
+              <View style={styles.doneActions}>
+                <Button
+                  title="Practise again"
+                  variant="secondary"
+                  onPress={restart}
+                  style={{ flex: 1 }}
+                />
+                <Button title="Done" onPress={() => router.back()} style={{ flex: 1 }} />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.inputBar}>
+              <TextInput
+                ref={inputRef}
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder="Type your answer…"
+                placeholderTextColor={colors.textFaint}
+                multiline
+                autoFocus
+                blurOnSubmit={false}
+                onSubmitEditing={onSend}
+              />
+              <Pressable
+                onPress={onSend}
+                disabled={!input.trim() || sending}
+                style={[styles.sendBtn, { opacity: !input.trim() || sending ? 0.4 : 1 }]}
+              >
+                <Ionicons name="arrow-up" size={22} color={colors.accentText} />
+              </Pressable>
+            </View>
+          )}
         </>
       )}
     </KeyboardAvoidingView>
@@ -271,7 +334,15 @@ function Bubble({
 }
 
 const styles = StyleSheet.create({
-  chat: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
+  chat: {
+    padding: spacing.lg,
+    gap: spacing.md,
+    paddingBottom: spacing.md,
+    // Stick content to the bottom (next to the input) so there's no dead gap
+    // above the input bar when the conversation is short.
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
   warming: { color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
   resumeHint: {
     flexDirection: 'row',
@@ -347,4 +418,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  doneBar: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  doneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center' },
+  doneText: { color: colors.text, fontSize: font.body, fontWeight: '700' },
+  doneActions: { flexDirection: 'row', gap: spacing.sm },
 });
