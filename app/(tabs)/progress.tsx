@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Empty, Pill, SectionTitle } from '@/components/ui';
 import { LessonPlan } from '@/components/LessonPlan';
-import { categoryColor, colors, font, radius, spacing, trendColor } from '@/theme';
+import { categoryColor, colors, font, spacing, trendColor } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useReviews } from '@/store/reviews';
 import { useSettings } from '@/store/settings';
@@ -58,18 +58,6 @@ export default function ProgressScreen() {
         <Stat value={recurring.reduce((a, r) => a + r.count, 0)} label="Mistakes" />
         <Stat value={reviews.length} label="Reviews" />
       </Card>
-
-      <Pressable
-        onPress={() => router.push('/learn')}
-        style={({ pressed }) => [styles.practiceCta, pressed && { opacity: 0.9 }]}
-      >
-        <Ionicons name="school" size={20} color={colors.accentText} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.practiceCtaTitle}>Your learning path</Text>
-          <Text style={styles.practiceCtaSub}>Lessons + free practice from your mistakes</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.accentText} />
-      </Pressable>
 
       <Button
         title={generating ? 'Reviewing your progress…' : 'Review now'}
@@ -293,16 +281,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   hintCenter: { color: colors.textFaint, fontSize: font.tiny, textAlign: 'center' },
-  practiceCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radius.md,
-    padding: spacing.md + 2,
-  },
-  practiceCtaTitle: { color: colors.accentText, fontSize: font.body, fontWeight: '800' },
-  practiceCtaSub: { color: colors.accentText, fontSize: font.tiny, opacity: 0.85, marginTop: 1 },
   catRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   recHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   catDot: { width: 8, height: 8, borderRadius: 4 },
