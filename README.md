@@ -41,23 +41,52 @@ tracks whether you're actually improving.
   (`expo-secure-store`) and calls go straight to OpenAI.
 - Sessions and progress are persisted locally with AsyncStorage.
 
+## Where do I put my OpenAI key?
+
+**Not in any file.** Launch the app → **Settings** tab → paste your key into **OpenAI API key** →
+**Save** → **Test**. It's stored only on-device (iOS Keychain) and sent straight to OpenAI. Get a
+key at <https://platform.openai.com/api-keys> (you'll need billing enabled on your OpenAI account).
+
 ## Getting started
+
+Built on **Expo SDK 56** (React 19 / React Native 0.85). Recording uses **`expo-audio`**.
 
 ```bash
 npm install
-
-# iOS Simulator (needs Xcode on a Mac) — builds a dev client:
-npm run ios
-
-# or start Metro and choose a target (press i for iOS, w for web):
-npm start
+npx expo start            # press  i = iOS simulator,  w = web
 ```
 
-Then open **Settings** in the app and paste your OpenAI API key
-(get one at https://platform.openai.com/api-keys). Tap **Test** to confirm it works.
+### Run on your iPhone — quick (Expo Go, Mac tethered)
 
-> Microphone recording requires a real device or the iOS Simulator — it won't capture audio in a
-> desktop browser the same way, but the rest of the UI works on web for development.
+1. Install **Expo Go** from the App Store.
+2. `npx expo start` on the Mac, iPhone + Mac on the same Wi-Fi.
+3. Scan the QR with the iPhone Camera. Allow microphone access.
+   (Expo Go must support SDK 56; the Mac dev server stays running while you use it.)
+
+### Run on your iPhone — standalone (no Mac needed to use it)
+
+Best for daily use. Requires a free **Expo account** and your **Apple Developer account**.
+
+```bash
+npm i -g eas-cli
+eas login
+eas init                  # links the project, writes extra.eas.projectId into app.json
+
+# Option A — ad-hoc build, installs straight onto your registered device (no App Store review):
+eas device:create         # register your iPhone (one-time)
+eas build -p ios --profile preview
+# open the build link on your iPhone and install. Done — works with the Mac closed.
+
+# Option B — TestFlight (nicer updates, light Apple review):
+eas build -p ios --profile production
+eas submit -p ios         # then install via the TestFlight app
+```
+
+After the first native build, JS-only changes can be shipped instantly without rebuilding:
+`eas update --channel preview` (or `production`).
+
+> Microphone recording needs a real device or the iOS Simulator. The web target runs the UI for
+> development but mic/keychain behave differently there.
 
 ## Configuration
 

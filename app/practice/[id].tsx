@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { Audio } from 'expo-av';
+import type { AudioPlayer } from 'expo-audio';
 import { Empty } from '@/components/ui';
 import { colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
@@ -192,11 +192,11 @@ function Bubble({
 }) {
   const isUser = message.role === 'user';
   const [loadingTts, setLoadingTts] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
     return () => {
-      soundRef.current?.unloadAsync();
+      soundRef.current?.remove();
     };
   }, []);
 

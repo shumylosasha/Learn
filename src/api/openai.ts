@@ -165,7 +165,7 @@ export async function generateTopic(apiKey: string, model: string): Promise<stri
 
 /**
  * Text-to-speech. Returns raw audio bytes as a base64 string (mp3), suitable
- * for writing to a file and playing with expo-av.
+ * for writing to a file and playing with expo-audio.
  */
 export async function synthesizeSpeech(
   apiKey: string,

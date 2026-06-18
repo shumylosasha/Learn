@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { Audio } from 'expo-av';
+import type { AudioPlayer } from 'expo-audio';
 import { Button, Card, Empty, Pill, SectionTitle } from '@/components/ui';
 import { categoryColor, colors, font, radius, severityColor, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
@@ -146,27 +146,27 @@ export default function SessionScreen() {
 }
 
 function PlayButton({ uri }: { uri: string }) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     return () => {
-      sound?.unloadAsync();
+      sound?.remove();
     };
   }, [sound]);
 
   const toggle = async () => {
     try {
       if (playing && sound) {
-        await sound.stopAsync();
+        sound.pause();
         setPlaying(false);
         return;
       }
       const s = await playUri(uri);
       setSound(s);
       setPlaying(true);
-      s.setOnPlaybackStatusUpdate((st) => {
-        if (st.isLoaded && st.didJustFinish) setPlaying(false);
+      s.addListener('playbackStatusUpdate', (st) => {
+        if (st.didJustFinish) setPlaying(false);
       });
     } catch {
       setPlaying(false);
