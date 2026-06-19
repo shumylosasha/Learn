@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '@/components/ui';
 import { categoryColor, colors, font, radius, spacing } from '@/theme';
@@ -49,6 +49,15 @@ export default function PathScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <Stack.Screen
+        options={{
+          headerLeft: () => (
+            <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
+              <Ionicons name="settings-outline" size={22} color={colors.text} />
+            </Pressable>
+          ),
+        }}
+      />
       {!apiKey && (
         <Pressable onPress={() => router.push('/settings')}>
           <View style={styles.warn}>

@@ -33,7 +33,8 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.bg },
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ title: 'Your path' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="record" options={{ title: 'New recording', presentation: 'card' }} />
         <Stack.Screen name="session/[id]" options={{ title: 'Recording' }} />
         <Stack.Screen name="flashcards/[id]" options={{ title: 'Flashcards', presentation: 'card' }} />
