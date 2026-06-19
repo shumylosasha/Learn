@@ -82,10 +82,21 @@ export default function SessionScreen() {
         {analysis && (
           <>
             {analysis.mistakes.length > 0 && (
-              <Button
-                title="Practise these mistakes"
-                onPress={() => router.push(`/practice/${session.id}`)}
-              />
+              <Card style={{ gap: spacing.sm }}>
+                <Text style={styles.learnHead}>Turn these mistakes into learning</Text>
+                <Button
+                  title="📘 Understand & practise (lesson)"
+                  onPress={() => router.push(`/practice/${session.id}`)}
+                />
+                <Button
+                  title="🃏 Flashcards"
+                  variant="secondary"
+                  onPress={() => router.push(`/flashcards/${session.id}`)}
+                />
+                <Text style={styles.learnHint}>
+                  Lesson teaches the rule (theory → practice → your turn). Flashcards drill recall.
+                </Text>
+              </Card>
             )}
 
             {analysis.mistakes.length > 0 && (
@@ -187,6 +198,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   date: { color: colors.textMuted, fontSize: font.small },
   topic: { color: colors.text, fontSize: font.body, lineHeight: 24, fontWeight: '600' },
+  learnHead: { color: colors.text, fontSize: font.body, fontWeight: '800' },
+  learnHint: { color: colors.textFaint, fontSize: font.tiny, lineHeight: 17 },
   playRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   playText: { color: colors.success, fontSize: font.small, fontWeight: '600' },
   statusCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
