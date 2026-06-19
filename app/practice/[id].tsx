@@ -59,10 +59,10 @@ export default function PracticeScreen() {
 
   const allSessions = useSessions((s) => s.sessions);
   const session = useSessions((s) => s.sessions.find((x) => x.id === threadId));
-  const node = usePath((s) => s.nodes.find((n) => n.id === threadId));
+  const lesson = usePath((s) => s.lessons.find((l) => l.id === threadId));
   const pathLoaded = usePath((s) => s.loaded);
   const loadPath = usePath((s) => s.load);
-  const markNodeComplete = usePath((s) => s.markComplete);
+  const markComplete = usePath((s) => s.markComplete);
   const latestReview = useReviews((s) => s.reviews[0]);
   const messages = usePractice((s) => s.threads[threadId]) ?? EMPTY_MESSAGES;
   const loaded = usePractice((s) => s.loaded[threadId]);
@@ -72,7 +72,7 @@ export default function PracticeScreen() {
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
 
-  const isLesson = node?.kind === 'topic';
+  const isLesson = !!lesson;
   const isRecordingSession = !isLesson && threadId !== GLOBAL_PRACTICE_ID && !!session;
   const finite = isLesson || isRecordingSession; // these sessions can "complete"
   // The relevant resource is resolved (or known-absent) so we can pick a prompt.
@@ -95,16 +95,16 @@ export default function PracticeScreen() {
     loadPath();
   }, [threadId, load, loadPath]);
 
-  // When a finite chat (lesson or recording drill) completes, tick its path node.
+  // When a lesson chat completes, tick it off in the path.
   useEffect(() => {
-    if (complete && node && node.status !== 'completed') {
-      markNodeComplete(node.id);
+    if (complete && lesson && lesson.status !== 'completed') {
+      markComplete(lesson.id);
     }
-  }, [complete, node, markNodeComplete]);
+  }, [complete, lesson, markComplete]);
 
   const systemPrompt = (): string => {
-    if (isLesson && node) {
-      return lessonSystemPrompt(node.title, node.area ?? node.title, node.basedOnTypes ?? []);
+    if (isLesson && lesson) {
+      return lessonSystemPrompt(lesson.title, lesson.area, lesson.basedOnTypes);
     }
     if (isRecordingSession && session?.analysis) {
       const mistakes = session.analysis.mistakes;

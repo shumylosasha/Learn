@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,8 @@ import type { AudioPlayer } from 'expo-audio';
 import { Button, Card, Empty, Pill, SectionTitle } from '@/components/ui';
 import { categoryColor, colors, font, radius, severityColor, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
+import { usePath } from '@/store/path';
+import { generateLessonsForSession } from '@/lib/path';
 import { processSession } from '@/lib/pipeline';
 import { formatDuration, playUri } from '@/lib/audio';
 import type { Mistake } from '@/types';
@@ -26,7 +29,27 @@ export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useSessions((s) => s.sessions.find((x) => x.id === id));
+  const allLessons = usePath((s) => s.lessons);
+  const loadPath = usePath((s) => s.load);
+  const lessons = useMemo(() => allLessons.filter((l) => l.sessionId === id), [allLessons, id]);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
+
+  useEffect(() => {
+    loadPath();
+  }, [loadPath]);
+
+  const createLessons = async () => {
+    if (!id) return;
+    setGenLoading(true);
+    try {
+      await generateLessonsForSession(id);
+    } catch (e) {
+      Alert.alert('Could not create lessons', e instanceof Error ? e.message : 'Try again.');
+    } finally {
+      setGenLoading(false);
+    }
+  };
 
   if (!session) {
     return <Empty title="Session not found" subtitle="It may have been deleted." />;
@@ -81,23 +104,27 @@ export default function SessionScreen() {
 
         {analysis && (
           <>
-            {analysis.mistakes.length > 0 && (
-              <Card style={{ gap: spacing.sm }}>
-                <Text style={styles.learnHead}>Turn these mistakes into learning</Text>
-                <Button
-                  title="📘 Understand & practise (lesson)"
-                  onPress={() => router.push(`/practice/${session.id}`)}
-                />
-                <Button
-                  title="🃏 Flashcards"
-                  variant="secondary"
-                  onPress={() => router.push(`/flashcards/${session.id}`)}
-                />
-                <Text style={styles.learnHint}>
-                  Lesson teaches the rule (theory → practice → your turn). Flashcards drill recall.
-                </Text>
-              </Card>
-            )}
+            {analysis.mistakes.length > 0 &&
+              (() => {
+                const nextLesson = lessons.find((l) => l.status !== 'completed') ?? lessons[0];
+                if (!nextLesson) {
+                  return genLoading ? (
+                    <Card style={styles.startCard}>
+                      <ActivityIndicator color={colors.accent} />
+                      <Text style={styles.startPrep}>Preparing your lessons from these mistakes…</Text>
+                    </Card>
+                  ) : (
+                    <Button title="Create lessons from these mistakes" onPress={createLessons} />
+                  );
+                }
+                const allDone = lessons.every((l) => l.status === 'completed');
+                return (
+                  <Button
+                    title={allDone ? 'Practise again' : '▶  Start lesson'}
+                    onPress={() => router.push(`/practice/${nextLesson.id}`)}
+                  />
+                );
+              })()}
 
             {analysis.mistakes.length > 0 && (
               <View>
@@ -198,8 +225,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   date: { color: colors.textMuted, fontSize: font.small },
   topic: { color: colors.text, fontSize: font.body, lineHeight: 24, fontWeight: '600' },
-  learnHead: { color: colors.text, fontSize: font.body, fontWeight: '800' },
-  learnHint: { color: colors.textFaint, fontSize: font.tiny, lineHeight: 17 },
+  startCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  startPrep: { color: colors.textMuted, fontSize: font.small, flex: 1 },
   playRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   playText: { color: colors.success, fontSize: font.small, fontWeight: '600' },
   statusCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

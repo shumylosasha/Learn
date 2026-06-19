@@ -3,125 +3,91 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { LessonSpec } from '@/api/openai';
 import type { MistakeCategory } from '@/types';
 
-const KEY = 'path_v1';
-
-export type PathNodeKind = 'topic' | 'recording';
+const KEY = 'path_v2';
 
 /**
- * One step in the single learning path. Either a `topic` lesson (theory +
- * practice on an area like articles) or a `recording` node (review & drill the
- * mistakes from one recording). Both open a chat at /practice/<id>; a recording
- * node's id IS its session id.
+ * One lesson in the path. Every lesson is generated FROM a specific recording's
+ * mistakes (sessionId), so the path reads as a clear history: each recording →
+ * its lessons. A lesson opens a chat at /practice/<id>.
  */
-export interface PathNode {
+export interface PathLesson {
   id: string;
-  kind: PathNodeKind;
+  sessionId: string;
   title: string;
   summary: string;
   category: MistakeCategory;
-  area?: string;
-  basedOnTypes?: string[];
-  sessionId?: string;
+  area: string;
+  basedOnTypes: string[];
   status: 'available' | 'completed';
   createdAt: number;
 }
 
 interface PathState {
-  nodes: PathNode[];
+  lessons: PathLesson[];
   loaded: boolean;
   load: () => Promise<void>;
-  /** Add a node for a just-analysed recording (idempotent by session id). */
-  addRecording: (sessionId: string, topic: string, createdAt: number) => void;
-  /** Append new topic lessons, skipping any already in the path. Returns #added. */
-  addTopics: (specs: LessonSpec[], createdAt: number) => number;
+  /** Add the lessons generated from one recording (idempotent per session). */
+  addForRecording: (sessionId: string, specs: LessonSpec[], createdAt: number) => void;
   markComplete: (id: string) => void;
   removeBySession: (sessionId: string) => void;
   clear: () => void;
 }
 
-function persist(nodes: PathNode[]) {
-  AsyncStorage.setItem(KEY, JSON.stringify(nodes)).catch(() => {});
-}
-
-function topicId(title: string): string {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-  return `topic_${slug || 'lesson'}`;
+function persist(lessons: PathLesson[]) {
+  AsyncStorage.setItem(KEY, JSON.stringify(lessons)).catch(() => {});
 }
 
 export const usePath = create<PathState>((set, get) => ({
-  nodes: [],
+  lessons: [],
   loaded: false,
 
   load: async () => {
-    let nodes: PathNode[] = [];
+    let lessons: PathLesson[] = [];
     try {
       const raw = await AsyncStorage.getItem(KEY);
-      if (raw) nodes = JSON.parse(raw);
+      if (raw) lessons = JSON.parse(raw);
     } catch {
-      nodes = [];
+      lessons = [];
     }
-    set({ nodes, loaded: true });
+    set({ lessons, loaded: true });
   },
 
-  addRecording: (sessionId, topic, createdAt) => {
-    if (get().nodes.some((n) => n.id === sessionId)) return;
-    const node: PathNode = {
-      id: sessionId,
-      kind: 'recording',
-      title: topic,
-      summary: 'See your mistakes from this recording and practise them.',
-      category: 'grammar',
+  addForRecording: (sessionId, specs, createdAt) => {
+    // Don't double-add if this recording already produced lessons.
+    if (get().lessons.some((l) => l.sessionId === sessionId)) return;
+    const additions: PathLesson[] = specs.map((spec, i) => ({
+      id: `lesson_${sessionId}_${i}`,
       sessionId,
+      title: spec.title,
+      summary: spec.summary,
+      category: spec.category,
+      area: spec.area,
+      basedOnTypes: spec.basedOnTypes,
       status: 'available',
       createdAt,
-    };
-    const nodes = [...get().nodes, node];
-    set({ nodes });
-    persist(nodes);
-  },
-
-  addTopics: (specs, createdAt) => {
-    const existing = new Set(get().nodes.map((n) => n.id));
-    const additions: PathNode[] = [];
-    for (const spec of specs) {
-      const id = topicId(spec.title);
-      if (existing.has(id)) continue;
-      existing.add(id);
-      additions.push({
-        id,
-        kind: 'topic',
-        title: spec.title,
-        summary: spec.summary,
-        category: spec.category,
-        area: spec.area,
-        basedOnTypes: spec.basedOnTypes,
-        status: 'available',
-        createdAt,
-      });
-    }
-    if (additions.length === 0) return 0;
-    const nodes = [...get().nodes, ...additions];
-    set({ nodes });
-    persist(nodes);
-    return additions.length;
+    }));
+    if (additions.length === 0) return;
+    const lessons = [...get().lessons, ...additions];
+    set({ lessons });
+    persist(lessons);
   },
 
   markComplete: (id) => {
-    const nodes = get().nodes.map((n) =>
-      n.id === id && n.status !== 'completed' ? { ...n, status: 'completed' as const } : n,
+    const lessons = get().lessons.map((l) =>
+      l.id === id && l.status !== 'completed' ? { ...l, status: 'completed' as const } : l,
     );
-    set({ nodes });
-    persist(nodes);
+    set({ lessons });
+    persist(lessons);
   },
 
   removeBySession: (sessionId) => {
-    const nodes = get().nodes.filter((n) => n.sessionId !== sessionId);
-    set({ nodes });
-    persist(nodes);
+    const lessons = get().lessons.filter((l) => l.sessionId !== sessionId);
+    set({ lessons });
+    persist(lessons);
   },
 
   clear: () => {
-    set({ nodes: [] });
+    set({ lessons: [] });
     persist([]);
   },
 }));
