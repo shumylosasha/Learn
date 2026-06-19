@@ -12,8 +12,11 @@ import {
   ANALYSIS_SCHEMA,
   ANALYSIS_SYSTEM_PROMPT,
   buildAnalysisUserMessage,
+  buildCoachUserMessage,
   buildLearningPathUserMessage,
   buildReviewUserMessage,
+  COACH_SCHEMA,
+  COACH_SYSTEM_PROMPT,
   LEARNING_PATH_SCHEMA,
   LEARNING_PATH_SYSTEM_PROMPT,
   REVIEW_SCHEMA,
@@ -164,6 +167,31 @@ export async function generateLearningPath(
   );
   const parsed = JSON.parse(content) as { lessons?: LessonSpec[] };
   return parsed.lessons ?? [];
+}
+
+export interface CoachInsightResult {
+  level: string;
+  summary: string;
+  improving: string[];
+  persistent: string[];
+  suggestedTopics: { title: string; why: string }[];
+}
+
+/** Cross-recording progress read + suggested next topics. */
+export async function generateCoach(
+  apiKey: string,
+  model: string,
+  recurringContext: string,
+  recentTopics: string,
+): Promise<CoachInsightResult> {
+  const content = await structuredCompletion(
+    apiKey,
+    model,
+    COACH_SYSTEM_PROMPT,
+    buildCoachUserMessage(recurringContext, recentTopics),
+    COACH_SCHEMA,
+  );
+  return JSON.parse(content) as CoachInsightResult;
 }
 
 async function structuredCompletion(

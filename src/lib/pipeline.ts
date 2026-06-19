@@ -1,6 +1,7 @@
 import { analyzeSpeaking, transcribeAudio } from '@/api/openai';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
+import { useCards } from '@/store/cards';
 import { extendPathAfterRecording } from '@/lib/path';
 
 /**
@@ -52,7 +53,11 @@ export async function processSession(sessionId: string): Promise<void> {
 
     store.setAnalysis(sessionId, analysis);
 
-    // Grow the learning path from this recording (adds a node + topic lessons).
+    // Add the mistakes to the spaced-repetition deck.
+    if (!useCards.getState().loaded) await useCards.getState().load();
+    useCards.getState().upsertFromMistakes(analysis.mistakes);
+
+    // Grow the learning path from this recording (adds topic lessons).
     await extendPathAfterRecording(sessionId);
   } catch (err) {
     store.updateSession(sessionId, {

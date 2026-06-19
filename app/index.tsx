@@ -6,6 +6,8 @@ import { categoryColor, colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
 import { usePath, type PathLesson } from '@/store/path';
+import { dueCards, useCards } from '@/store/cards';
+import { useCoach } from '@/store/coach';
 import { computeStreak } from '@/lib/streak';
 import type { Session } from '@/types';
 
@@ -15,11 +17,30 @@ export default function HomeScreen() {
   const sessions = useSessions((s) => s.sessions);
   const lessons = usePath((s) => s.lessons);
   const load = usePath((s) => s.load);
+  const cards = useCards((s) => s.cards);
+  const loadCards = useCards((s) => s.load);
+  const coach = useCoach((s) => s.insight);
+  const coachGenerating = useCoach((s) => s.generating);
+  const loadCoach = useCoach((s) => s.load);
+  const coachLoaded = useCoach((s) => s.loaded);
+  const generateCoach = useCoach((s) => s.generate);
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadCards();
+    loadCoach();
+  }, [load, loadCards, loadCoach]);
 
+  const analysed = sessions.filter((s) => s.analysis).length;
+
+  // Refresh the coach when there's enough new material (and it isn't running).
+  useEffect(() => {
+    if (!apiKey || !coachLoaded || coachGenerating) return;
+    const stale = !coach || analysed - coach.basis >= 2;
+    if (analysed >= 2 && stale) generateCoach();
+  }, [apiKey, coachLoaded, coachGenerating, coach, analysed, generateCoach]);
+
+  const due = dueCards(cards).length;
   const streak = computeStreak(sessions);
   const sessionsDesc = [...sessions].sort((a, b) => b.createdAt - a.createdAt);
   const lessonsFor = (id: string) => lessons.filter((l) => l.sessionId === id);
@@ -49,6 +70,13 @@ export default function HomeScreen() {
 
       {streak.current > 0 && (
         <Text style={styles.streak}>🔥 {streak.current}-day streak</Text>
+      )}
+
+      {due > 0 && (
+        <Pressable onPress={() => router.push('/review')} style={styles.reviewBanner}>
+          <Text style={styles.reviewText}>🃏 {due} card{due === 1 ? '' : 's'} to review</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+        </Pressable>
       )}
 
       {/* ── The single clear next step ───────────────────────────── */}
@@ -88,6 +116,37 @@ export default function HomeScreen() {
           <Ionicons name="mic-outline" size={16} color={colors.accent} />
           <Text style={styles.recordLinkText}>Record a new clip</Text>
         </Pressable>
+      )}
+
+      {/* ── Coach: progress read + what to record next ───────────── */}
+      {coach && (
+        <View style={styles.coach}>
+          <View style={styles.coachHead}>
+            <Text style={styles.coachTitle}>📈 Your coach</Text>
+            <Text style={styles.coachLevel}>Level {coach.level}</Text>
+          </View>
+          <Text style={styles.coachSummary}>{coach.summary}</Text>
+          {coach.suggestedTopics.length > 0 && (
+            <>
+              <Text style={styles.coachSub}>Try recording next</Text>
+              {coach.suggestedTopics.slice(0, 3).map((t, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => router.push({ pathname: '/record', params: { topic: t.title } })}
+                  style={({ pressed }) => [styles.suggestRow, pressed && { opacity: 0.85 }]}
+                >
+                  <Ionicons name="mic-outline" size={15} color={colors.accent} />
+                  <Text style={styles.suggestText} numberOfLines={2}>
+                    {t.title}
+                  </Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+        </View>
+      )}
+      {coachGenerating && !coach && (
+        <Text style={styles.coachLoading}>Reading your overall progress…</Text>
       )}
 
       {/* ── History: each recording and its lessons ──────────────── */}
@@ -203,6 +262,46 @@ const styles = StyleSheet.create({
   },
   warnText: { color: colors.warning, fontSize: font.small, flex: 1 },
   streak: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
+  reviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+  },
+  reviewText: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
+  coach: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  coachHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  coachTitle: { color: colors.text, fontSize: font.body, fontWeight: '800' },
+  coachLevel: { color: colors.textMuted, fontSize: font.tiny, fontWeight: '700' },
+  coachSummary: { color: colors.text, fontSize: font.small, lineHeight: 21 },
+  coachSub: {
+    color: colors.textMuted,
+    fontSize: font.tiny,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: spacing.xs,
+  },
+  suggestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+  },
+  suggestText: { color: colors.text, fontSize: font.small, flex: 1, lineHeight: 19 },
+  coachLoading: { color: colors.textFaint, fontSize: font.tiny, fontStyle: 'italic', textAlign: 'center' },
   hero: {
     backgroundColor: colors.accent,
     borderRadius: radius.lg,

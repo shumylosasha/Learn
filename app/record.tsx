@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
@@ -36,11 +36,12 @@ function tap() {
 
 export default function RecordScreen() {
   const router = useRouter();
+  const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
   const createSession = useSessions((s) => s.createSession);
 
-  const [topic, setTopic] = useState(randomTopic());
+  const [topic, setTopic] = useState(() => topicParam || randomTopic());
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);

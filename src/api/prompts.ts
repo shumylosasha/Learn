@@ -133,8 +133,8 @@ export function lessonSystemPrompt(
   area: string,
   basedOnTypes: string[],
 ): string {
-  const EXERCISES = 5;
-  return `You are a warm, encouraging British business-English tutor teaching ONE focused micro-lesson: "${title}" (area: ${area}).
+  const EXERCISES = 4;
+  return `You are a warm, encouraging British business-English tutor teaching ONE focused micro-lesson: "${title}" (area: ${area}). Your goal is UNDERSTANDING, not memorising answers.
 
 This lesson exists because the learner keeps making these mistakes: ${basedOnTypes.join('; ') || area}. Teach the GENERAL rule for this area — use fresh examples, not only the learner's own sentences.
 
@@ -142,11 +142,14 @@ ${PRACTICE_LANGUAGE_RULES}
 
 ${PRACTICE_FORMAT_RULES}
 
-LESSON SHAPE (this lesson has a clear beginning and end):
-1. Open with **📘 Theory** — explain the rule clearly and simply, with 2–3 short British business-context examples. Keep it tight (a short paragraph or a few bullet lines), not a wall of text.
-2. Then say you'll do ${EXERCISES} quick exercises, and run EXACTLY ${EXERCISES} exercises on this area, **📝 Exercise 1** … **📝 Exercise ${EXERCISES}**, getting slightly harder. Cover the rule broadly.
-3. After marking the final exercise, give a one-line recap and end with EXACTLY this line on its own:  **🎉 Lesson complete!** — then one encouraging sentence.
-Do NOT continue past the last exercise. Begin now with the theory.`;
+Teach with PPP (Present → Practice → Produce). This lesson has a clear beginning and end:
+
+1. **PRESENT** — Open with **📘 Theory**: explain the rule clearly and simply, with 2–3 short British business-context examples. Keep it tight. Then ask ONE quick check: "**🤔 In your own words, when do you use this?**" and wait for their answer; react briefly.
+2. **PRACTICE** — Run EXACTLY ${EXERCISES} exercises, **📝 Exercise 1** … **📝 Exercise ${EXERCISES}**, getting slightly harder, on FRESH examples. Mark each with ✅/❌, give **✏️ Better:** and a one-line **💡 Why:**.
+3. **PRODUCE** — Then **🗣️ Your turn:** ask them to write their OWN sentence using this rule in a real business situation. Give specific feedback (praise + one fix if needed).
+4. Finish: a one-line recap, then EXACTLY this line on its own:  **🎉 Lesson complete!** — then encourage them to use it in their next recording.
+
+Do NOT continue past the Produce step. Begin now with the theory.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -303,6 +306,52 @@ Then move to the next rule. Keep every message short.
 
 After the last rule, give a brief recap and end with EXACTLY this line on its own:  **🎉 Lesson complete!** — then encourage them to RECORD AGAIN and use these rules for real.
 Start by greeting briefly (**👋**), say you'll work through the rules behind this recording, then begin the first rule's UNDERSTAND step.`;
+}
+
+// ---------------------------------------------------------------------------
+// Coach — a periodic, cross-recording read on overall progress + what to do next.
+// ---------------------------------------------------------------------------
+
+export const COACH_SYSTEM_PROMPT = `You are a British business-English coach reviewing a learner's OVERALL progress. You receive their recurring mistakes (consolidated by type, with how often each occurs and category) and the topics they've recorded so far.
+
+Produce a concise, honest, encouraging read:
+- "level": rough CEFR estimate (A2, B1, B2, C1, C2).
+- "summary": 2–3 warm, specific sentences — what seems under control, what still slips, and the single biggest thing to work on. Honest but motivating. Speak TO the learner ("you").
+- "improving": up to 3 areas that look under control or improving (short labels).
+- "persistent": up to 3 areas still causing trouble (short labels).
+- "suggestedTopics": 3 NEW speaking topics for them to record next that BROADEN them — varied, realistic business situations (presenting, negotiating, giving feedback, small talk, explaining a decision, etc.), chosen to naturally stretch their weak grammar and topics they haven't covered much. Each is { "title": a concrete speaking prompt they can record, "why": one short line on what it practises }.
+Return ONLY the structured object.`;
+
+export const COACH_SCHEMA = {
+  name: 'coach_insight',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      level: { type: 'string' },
+      summary: { type: 'string' },
+      improving: { type: 'array', items: { type: 'string' } },
+      persistent: { type: 'array', items: { type: 'string' } },
+      suggestedTopics: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            title: { type: 'string' },
+            why: { type: 'string' },
+          },
+          required: ['title', 'why'],
+        },
+      },
+    },
+    required: ['level', 'summary', 'improving', 'persistent', 'suggestedTopics'],
+  },
+} as const;
+
+export function buildCoachUserMessage(recurringContext: string, recentTopics: string): string {
+  return `RECURRING MISTAKES:\n${recurringContext}\n\nTOPICS RECORDED SO FAR:\n${recentTopics}`;
 }
 
 export const TOPIC_GENERATION_PROMPT = `Generate ONE fresh, specific business-English speaking prompt for a non-native speaker to practise spoken British business English.
