@@ -4,23 +4,22 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSettings } from '@/store/settings';
 import { useSessions } from '@/store/sessions';
-import { useReviews } from '@/store/reviews';
-import { maybeAutoReview } from '@/lib/review';
+import { usePath } from '@/store/path';
+import { useUsage } from '@/store/usage';
 import { colors } from '@/theme';
 
 export default function RootLayout() {
   const loadSettings = useSettings((s) => s.load);
   const loadSessions = useSessions((s) => s.load);
-  const loadReviews = useReviews((s) => s.load);
+  const loadPath = usePath((s) => s.load);
+  const loadUsage = useUsage((s) => s.load);
 
   useEffect(() => {
     (async () => {
-      // Load everything, then auto-generate a review if one is due.
-      // Practice threads load lazily on the practice screen, keyed by id.
-      await Promise.all([loadSettings(), loadSessions(), loadReviews()]);
-      maybeAutoReview();
+      // Load core stores up front. Practice threads load lazily, keyed by id.
+      await Promise.all([loadSettings(), loadSessions(), loadPath(), loadUsage()]);
     })();
-  }, [loadSettings, loadSessions, loadReviews]);
+  }, [loadSettings, loadSessions, loadPath, loadUsage]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -35,7 +34,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="session/[id]" options={{ title: 'Feedback' }} />
+        <Stack.Screen name="record" options={{ title: 'New recording', presentation: 'card' }} />
+        <Stack.Screen name="session/[id]" options={{ title: 'Recording' }} />
         <Stack.Screen
           name="practice/[id]"
           options={{ title: 'Practice', presentation: 'card' }}

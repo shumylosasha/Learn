@@ -21,7 +21,7 @@ import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
 import { useReviews } from '@/store/reviews';
 import { GLOBAL_PRACTICE_ID, usePractice } from '@/store/practice';
-import { useLessons } from '@/store/lessons';
+import { usePath } from '@/store/path';
 import { chatComplete, synthesizeSpeech, type ChatMessageInput } from '@/api/openai';
 import {
   lessonSystemPrompt,
@@ -59,10 +59,10 @@ export default function PracticeScreen() {
 
   const allSessions = useSessions((s) => s.sessions);
   const session = useSessions((s) => s.sessions.find((x) => x.id === threadId));
-  const lesson = useLessons((s) => s.lessons.find((l) => l.id === threadId));
-  const lessonsLoaded = useLessons((s) => s.loaded);
-  const loadLessons = useLessons((s) => s.load);
-  const markLessonComplete = useLessons((s) => s.markComplete);
+  const node = usePath((s) => s.nodes.find((n) => n.id === threadId));
+  const pathLoaded = usePath((s) => s.loaded);
+  const loadPath = usePath((s) => s.load);
+  const markNodeComplete = usePath((s) => s.markComplete);
   const latestReview = useReviews((s) => s.reviews[0]);
   const messages = usePractice((s) => s.threads[threadId]) ?? EMPTY_MESSAGES;
   const loaded = usePractice((s) => s.loaded[threadId]);
@@ -72,12 +72,12 @@ export default function PracticeScreen() {
   const apiKey = useSettings((s) => s.apiKey);
   const prefs = useSettings((s) => s.prefs);
 
-  const isLesson = !!lesson;
+  const isLesson = node?.kind === 'topic';
   const isRecordingSession = !isLesson && threadId !== GLOBAL_PRACTICE_ID && !!session;
   const finite = isLesson || isRecordingSession; // these sessions can "complete"
   // The relevant resource is resolved (or known-absent) so we can pick a prompt.
   const resourceReady =
-    threadId === GLOBAL_PRACTICE_ID || isLesson || isRecordingSession || lessonsLoaded;
+    threadId === GLOBAL_PRACTICE_ID || isLesson || isRecordingSession || pathLoaded;
 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -92,19 +92,19 @@ export default function PracticeScreen() {
 
   useEffect(() => {
     load(threadId);
-    loadLessons();
-  }, [threadId, load, loadLessons]);
+    loadPath();
+  }, [threadId, load, loadPath]);
 
-  // When a lesson's chat reaches completion, tick it off in the learning path.
+  // When a finite chat (lesson or recording drill) completes, tick its path node.
   useEffect(() => {
-    if (complete && lesson && lesson.status !== 'completed') {
-      markLessonComplete(lesson.id);
+    if (complete && node && node.status !== 'completed') {
+      markNodeComplete(node.id);
     }
-  }, [complete, lesson, markLessonComplete]);
+  }, [complete, node, markNodeComplete]);
 
   const systemPrompt = (): string => {
-    if (isLesson && lesson) {
-      return lessonSystemPrompt(lesson.title, lesson.area, lesson.basedOnTypes);
+    if (isLesson && node) {
+      return lessonSystemPrompt(node.title, node.area ?? node.title, node.basedOnTypes ?? []);
     }
     if (isRecordingSession && session?.analysis) {
       const mistakes = session.analysis.mistakes;

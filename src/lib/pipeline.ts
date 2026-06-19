@@ -1,6 +1,7 @@
 import { analyzeSpeaking, transcribeAudio } from '@/api/openai';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
+import { extendPathAfterRecording } from '@/lib/path';
 
 /**
  * Run the full transcribe → analyse pipeline for a session, updating its status
@@ -50,6 +51,9 @@ export async function processSession(sessionId: string): Promise<void> {
     );
 
     store.setAnalysis(sessionId, analysis);
+
+    // Grow the learning path from this recording (adds a node + topic lessons).
+    await extendPathAfterRecording(sessionId);
   } catch (err) {
     store.updateSession(sessionId, {
       status: 'error',

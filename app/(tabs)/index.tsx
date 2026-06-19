@@ -1,128 +1,50 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { Platform } from 'react-native';
-import { Button, Card, Pill, SectionTitle } from '@/components/ui';
-import { colors, font, radius, spacing } from '@/theme';
-import { TOPIC_GROUPS, randomTopic } from '@/lib/topics';
-import {
-  cancelRecording,
-  ensureMicPermission,
-  formatDuration,
-  getInputLevel,
-  startRecording,
-  stopRecording,
-} from '@/lib/audio';
-import { generateTopic } from '@/api/openai';
-import { useSettings } from '@/store/settings';
+import { Card } from '@/components/ui';
+import { categoryColor, colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
-import { processSession } from '@/lib/pipeline';
+import { useSettings } from '@/store/settings';
+import { usePath, type PathNode } from '@/store/path';
 import { computeStreak } from '@/lib/streak';
+import { generateMoreTopics } from '@/lib/path';
 
-function tap() {
-  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-}
-
-export default function SpeakScreen() {
+export default function PathScreen() {
   const router = useRouter();
   const apiKey = useSettings((s) => s.apiKey);
-  const prefs = useSettings((s) => s.prefs);
-  const createSession = useSessions((s) => s.createSession);
   const sessions = useSessions((s) => s.sessions);
-  const streak = computeStreak(sessions);
+  const nodes = usePath((s) => s.nodes);
+  const loaded = usePath((s) => s.loaded);
+  const load = usePath((s) => s.load);
 
-  const [topic, setTopic] = useState(randomTopic());
-  const [recording, setRecording] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
-  const startedAt = useRef(0);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [building, setBuilding] = useState(false);
 
   useEffect(() => {
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-      cancelRecording();
-    };
-  }, []);
+    load();
+  }, [load]);
 
-  const onShuffle = () => {
-    tap();
-    setTopic(randomTopic());
+  const streak = computeStreak(sessions);
+  const done = nodes.filter((n) => n.status === 'completed').length;
+  const firstOpenIndex = nodes.findIndex((n) => n.status !== 'completed');
+
+  const openNode = (node: PathNode) => {
+    if (node.kind === 'recording') router.push(`/session/${node.sessionId}`);
+    else router.push(`/practice/${node.id}`);
   };
 
-  const onSuggest = async () => {
-    if (!apiKey) {
-      promptForKey();
-      return;
-    }
-    setSuggesting(true);
+  const createMore = async () => {
+    setBuilding(true);
     try {
-      const t = await generateTopic(apiKey, prefs.analysisModel);
-      if (t) setTopic(t);
+      const added = await generateMoreTopics();
+      if (added === 0) {
+        Alert.alert('Nothing new to add', 'Record a bit more, then try again.');
+      }
     } catch (e) {
-      Alert.alert('Could not suggest a topic', e instanceof Error ? e.message : 'Try again.');
+      Alert.alert('Could not add lessons', e instanceof Error ? e.message : 'Try again.');
     } finally {
-      setSuggesting(false);
+      setBuilding(false);
     }
-  };
-
-  const promptForKey = () => {
-    Alert.alert(
-      'Add your OpenAI key',
-      'Go to Settings and paste your OpenAI API key to enable recording analysis.',
-      [{ text: 'OK' }],
-    );
-  };
-
-  const onStart = async () => {
-    const granted = await ensureMicPermission();
-    if (!granted) {
-      Alert.alert('Microphone needed', 'Please allow microphone access to record.');
-      return;
-    }
-    try {
-      await startRecording();
-      tap();
-      setRecording(true);
-      startedAt.current = Date.now();
-      setElapsed(0);
-      timer.current = setInterval(() => setElapsed(Date.now() - startedAt.current), 200);
-    } catch (e) {
-      Alert.alert('Recording failed', e instanceof Error ? e.message : 'Try again.');
-    }
-  };
-
-  const onStop = async () => {
-    if (timer.current) clearInterval(timer.current);
-    setRecording(false);
-    const result = await stopRecording();
-    tap();
-    if (!result) {
-      Alert.alert('No audio captured', 'Please try recording again.');
-      return;
-    }
-    const session = createSession({
-      topic,
-      audioUri: result.uri,
-      durationMs: result.durationMs,
-    });
-    // Fire the pipeline; the detail screen reflects live status from the store.
-    processSession(session.id);
-    router.push(`/session/${session.id}`);
   };
 
   return (
@@ -136,253 +58,136 @@ export default function SpeakScreen() {
         </Pressable>
       )}
 
-      {streak.current > 0 && (
-        <View style={styles.streakChip}>
-          <Text style={styles.streakChipText}>🔥 {streak.current}-day streak</Text>
-          {!streak.activeToday && (
-            <Text style={styles.streakChipSub}>· record today to keep it</Text>
+      {(nodes.length > 0 || streak.current > 0) && (
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>
+            {nodes.length > 0 ? `${done} of ${nodes.length} lessons done` : ''}
+          </Text>
+          {streak.current > 0 && (
+            <View style={styles.streakChip}>
+              <Text style={styles.streakChipText}>🔥 {streak.current}</Text>
+            </View>
           )}
         </View>
       )}
 
-      <SectionTitle>Your speaking topic</SectionTitle>
-      <Card style={{ gap: spacing.md }}>
-        <Text style={styles.topicText}>{topic}</Text>
-        <View style={styles.topicActions}>
-          <ToolButton icon="create-outline" label="Write own" onPress={() => setCustomOpen(true)} />
-          <ToolButton icon="shuffle" label="Shuffle" onPress={onShuffle} />
-          <ToolButton
-            icon="sparkles"
-            label={suggesting ? 'Thinking…' : 'AI suggest'}
-            onPress={onSuggest}
-            disabled={suggesting}
-          />
-          <ToolButton icon="list" label="Browse" onPress={() => setPickerOpen(true)} />
+      <Pressable
+        onPress={() => router.push('/record')}
+        style={({ pressed }) => [styles.recordCta, pressed && { opacity: 0.9 }]}
+      >
+        <Ionicons name="mic" size={22} color={colors.accentText} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.recordTitle}>Record yourself</Text>
+          <Text style={styles.recordSub}>
+            {nodes.length === 0
+              ? 'Speak about anything — I’ll build your lessons from it'
+              : 'Add a recording to grow your path'}
+          </Text>
         </View>
-      </Card>
+        <Ionicons name="chevron-forward" size={18} color={colors.accentText} />
+      </Pressable>
 
-      <View style={styles.recordZone}>
-        <View style={styles.waveWrap}>
-          {recording ? (
-            <Waveform />
-          ) : (
-            <Ionicons name="mic-outline" size={28} color={colors.textFaint} />
-          )}
+      {loaded && nodes.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyTitle}>Your journey starts with a recording</Text>
+          <Text style={styles.emptyText}>
+            Record yourself speaking. I’ll find your mistakes and turn them into a path of short
+            lessons — fix that recording, then work through bigger topics like articles or tenses.
+          </Text>
         </View>
+      ) : (
+        <View>
+          {nodes.map((node, i) => (
+            <NodeRow
+              key={node.id}
+              node={node}
+              index={i}
+              isLast={i === nodes.length - 1}
+              isNext={i === firstOpenIndex}
+              onPress={() => openNode(node)}
+            />
+          ))}
+        </View>
+      )}
 
-        <Text style={styles.recordHint}>
-          {recording ? formatDuration(elapsed) : 'Ready when you are'}
-        </Text>
-
+      {nodes.length > 0 && (
         <Pressable
-          onPress={recording ? onStop : onStart}
-          style={({ pressed }) => [
-            styles.recordButton,
-            {
-              backgroundColor: recording ? colors.danger : colors.accent,
-              transform: [{ scale: pressed ? 0.96 : 1 }],
-            },
-          ]}
+          onPress={createMore}
+          disabled={building}
+          style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.85 }]}
         >
-          <Ionicons name={recording ? 'stop' : 'mic'} size={44} color={colors.accentText} />
+          <Ionicons name="sparkles" size={16} color={colors.accent} />
+          <Text style={styles.moreText}>
+            {building ? 'Creating lessons…' : 'Create more lessons'}
+          </Text>
         </Pressable>
-
-        <Text style={styles.recordSub}>
-          {recording
-            ? 'Speak naturally about the topic, then tap to stop.'
-            : 'Aim for 30–120 seconds. The AI analyses your grammar and word choice.'}
-        </Text>
-      </View>
-
-      <CustomTopicModal
-        open={customOpen}
-        initial={topic}
-        onClose={() => setCustomOpen(false)}
-        onSave={(t) => {
-          setTopic(t);
-          setCustomOpen(false);
-        }}
-      />
-
-      <TopicPicker
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onPick={(t) => {
-          setTopic(t);
-          setPickerOpen(false);
-        }}
-      />
+      )}
     </ScrollView>
   );
 }
 
-const WAVE_BARS = 28;
-
-/** A live audio-level waveform: bars scroll right-to-left, heights track the mic. */
-function Waveform() {
-  const [levels, setLevels] = useState<number[]>(() => new Array(WAVE_BARS).fill(0));
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const level = getInputLevel();
-      setLevels((prev) => [...prev.slice(1), level]);
-    }, 90);
-    return () => clearInterval(id);
-  }, []);
+function NodeRow({
+  node,
+  index,
+  isLast,
+  isNext,
+  onPress,
+}: {
+  node: PathNode;
+  index: number;
+  isLast: boolean;
+  isNext: boolean;
+  onPress: () => void;
+}) {
+  const done = node.status === 'completed';
+  const isRecording = node.kind === 'recording';
+  const accent = isRecording ? colors.accent : categoryColor(node.category);
+  const circleColor = done ? colors.success : accent;
 
   return (
-    <View style={styles.wave}>
-      {levels.map((level, i) => {
-        // Emphasise the upper range so normal speech reads clearly; keep a
-        // minimum so silent bars still show a tidy baseline.
-        const height = 4 + Math.pow(level, 0.7) * 44;
-        return (
-          <View
-            key={i}
-            style={[
-              styles.waveBar,
-              { height, opacity: 0.35 + level * 0.65 },
-            ]}
-          />
-        );
-      })}
+    <View style={styles.nodeRow}>
+      <View style={styles.rail}>
+        <View style={[styles.circle, { backgroundColor: circleColor }, isNext && styles.circleNext]}>
+          {done ? (
+            <Ionicons name="checkmark" size={18} color={colors.accentText} />
+          ) : isRecording ? (
+            <Ionicons name="mic" size={16} color={colors.accentText} />
+          ) : (
+            <Text style={styles.circleNum}>{index + 1}</Text>
+          )}
+        </View>
+        {!isLast && <View style={styles.connector} />}
+      </View>
+
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.nodeCard,
+          isNext && styles.nodeCardNext,
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[styles.nodeTitle, done && styles.nodeTitleDone]} numberOfLines={2}>
+            {node.title}
+          </Text>
+          <Text style={styles.nodeSummary} numberOfLines={2}>
+            {node.summary}
+          </Text>
+          <Text style={[styles.nodeTag, { color: isRecording ? colors.accent : accent }]}>
+            {isRecording ? 'recording · view & practise' : node.category}
+            {done ? ' · done' : isNext ? ' · next up' : ''}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+      </Pressable>
     </View>
   );
 }
 
-function ToolButton({
-  icon,
-  label,
-  onPress,
-  disabled,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.toolButton,
-        { opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
-      ]}
-    >
-      <Ionicons name={icon} size={16} color={colors.text} />
-      <Text style={styles.toolLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function CustomTopicModal({
-  open,
-  initial,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  initial: string;
-  onClose: () => void;
-  onSave: (topic: string) => void;
-}) {
-  const [text, setText] = useState(initial);
-
-  // Reset the field to the current topic each time the sheet opens.
-  useEffect(() => {
-    if (open) setText(initial);
-  }, [open, initial]);
-
-  const trimmed = text.trim();
-
-  return (
-    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalBackdrop}
-      >
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Your own topic</Text>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={24} color={colors.textMuted} />
-            </Pressable>
-          </View>
-          <Text style={styles.customHelp}>
-            Talk about anything from your work — a deal you're closing, a standup update, pitching
-            your product, a tricky email you need to say out loud. The AI uses this as context.
-          </Text>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder="e.g. Walk through this week's progress to my manager"
-            placeholderTextColor={colors.textFaint}
-            multiline
-            autoFocus
-            style={styles.customInput}
-          />
-          <Button
-            title="Use this topic"
-            onPress={() => onSave(trimmed)}
-            disabled={trimmed.length === 0}
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-function TopicPicker({
-  open,
-  onClose,
-  onPick,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onPick: (topic: string) => void;
-}) {
-  return (
-    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Choose a topic</Text>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={24} color={colors.textMuted} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-            {TOPIC_GROUPS.map((group) => (
-              <View key={group.label} style={{ marginBottom: spacing.lg }}>
-                <Text style={styles.groupLabel}>{group.label}</Text>
-                {group.topics.map((t) => (
-                  <Pressable
-                    key={t}
-                    onPress={() => onPick(t)}
-                    style={({ pressed }) => [
-                      styles.topicRow,
-                      { backgroundColor: pressed ? colors.surfaceAlt : colors.surface },
-                    ]}
-                  >
-                    <Text style={styles.topicRowText}>{t}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
+const RAIL = 40;
 const styles = StyleSheet.create({
-  container: {
-    padding: spacing.lg,
-    gap: spacing.md,
-    paddingBottom: spacing.xxl,
-  },
+  container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   warn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,119 +199,80 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   warnText: { color: colors.warning, fontSize: font.small, flex: 1 },
-  streakChip: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  subtitle: { color: colors.textMuted, fontSize: font.small, flex: 1 },
+  streakChip: {
     backgroundColor: colors.accentSoft,
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: spacing.md,
   },
-  streakChipText: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
-  streakChipSub: { color: colors.textMuted, fontSize: font.tiny },
-  topicText: { color: colors.text, fontSize: font.h3, lineHeight: 26, fontWeight: '600' },
-  topicActions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  toolButton: {
+  streakChipText: { color: colors.accent, fontSize: font.body, fontWeight: '800' },
+  recordCta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderWidth: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-  },
-  toolLabel: { color: colors.text, fontSize: font.small, fontWeight: '600' },
-  recordZone: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.lg },
-  waveWrap: {
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  wave: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 52,
-    gap: 3,
-  },
-  waveBar: {
-    width: 4,
-    borderRadius: 2,
+    gap: spacing.md,
     backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    padding: spacing.md + 2,
   },
-  recordButton: {
-    width: 132,
-    height: 132,
-    borderRadius: 66,
+  recordTitle: { color: colors.accentText, fontSize: font.body, fontWeight: '800' },
+  recordSub: { color: colors.accentText, fontSize: font.tiny, opacity: 0.85, marginTop: 1 },
+  emptyWrap: { paddingVertical: spacing.xl, gap: spacing.sm },
+  emptyTitle: { color: colors.text, fontSize: font.h3, fontWeight: '700', textAlign: 'center' },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: font.small,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  nodeRow: { flexDirection: 'row', gap: spacing.md },
+  rail: { width: RAIL, alignItems: 'center' },
+  circle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    marginTop: spacing.md,
   },
-  recordHint: { color: colors.text, fontSize: font.h2, fontWeight: '800' },
-  recordSub: {
-    color: colors.textMuted,
-    fontSize: font.small,
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 20,
-  },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: colors.bg,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    padding: spacing.lg,
-    maxHeight: '82%',
-    borderTopWidth: 1,
-    borderColor: colors.border,
-  },
-  modalHeader: {
+  circleNext: { borderWidth: 3, borderColor: colors.accentSoft },
+  circleNum: { color: colors.accentText, fontSize: font.small, fontWeight: '800' },
+  connector: { width: 2, flex: 1, backgroundColor: colors.border, marginVertical: 2 },
+  nodeCard: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalTitle: { color: colors.text, fontSize: font.h2, fontWeight: '800' },
-  customHelp: {
-    color: colors.textMuted,
-    fontSize: font.small,
-    lineHeight: 20,
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
     marginBottom: spacing.md,
   },
-  customInput: {
-    color: colors.text,
-    fontSize: font.body,
-    lineHeight: 24,
-    minHeight: 96,
-    textAlignVertical: 'top',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  groupLabel: {
-    color: colors.textMuted,
+  nodeCardNext: { borderColor: colors.accent },
+  nodeTitle: { color: colors.text, fontSize: font.body, fontWeight: '700', lineHeight: 21 },
+  nodeTitleDone: { color: colors.textMuted },
+  nodeSummary: { color: colors.textMuted, fontSize: font.small, lineHeight: 19 },
+  nodeTag: {
     fontSize: font.tiny,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.sm,
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
-  topicRow: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
+  moreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
   },
-  topicRowText: { color: colors.text, fontSize: font.body, lineHeight: 22 },
+  moreText: { color: colors.accent, fontSize: font.small, fontWeight: '700' },
 });

@@ -160,46 +160,6 @@ export default function SettingsScreen() {
       </View>
 
       <View>
-        <SectionTitle>Reviews</SectionTitle>
-        <Card style={{ gap: spacing.md }}>
-          <Label>Auto-generate a cumulative review</Label>
-          <View style={styles.voiceRow}>
-            {[
-              { label: 'Weekly', days: 7 },
-              { label: 'Daily', days: 1 },
-              { label: 'Manual only', days: 0 },
-            ].map((opt) => (
-              <Pressable
-                key={opt.label}
-                onPress={() => setPrefs({ reviewCadenceDays: opt.days })}
-                style={[
-                  styles.voiceChip,
-                  prefs.reviewCadenceDays === opt.days && {
-                    backgroundColor: colors.accent,
-                    borderColor: colors.accent,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.voiceText,
-                    prefs.reviewCadenceDays === opt.days && { color: colors.accentText },
-                  ]}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.note}>
-            When due, the review is generated automatically the next time you open the app. You can
-            also tap “Review now” on the Progress tab anytime. True overnight processing isn’t
-            possible without a server.
-          </Text>
-        </Card>
-      </View>
-
-      <View>
         <SectionTitle>Usage & estimated cost</SectionTitle>
         <Card style={{ gap: spacing.md }}>
           <View style={styles.totalRow}>
@@ -290,6 +250,7 @@ function ModelField({
 
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  screenTitle: { color: colors.text, fontSize: font.h1, fontWeight: '800' },
   status: { color: colors.textMuted, fontSize: font.small },
   keyRow: { position: 'relative', justifyContent: 'center' },
   input: {

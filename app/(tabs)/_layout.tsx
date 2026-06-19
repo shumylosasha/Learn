@@ -22,35 +22,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Speak',
-          tabBarLabel: 'Speak',
-          tabBarIcon: ({ color, size }) => <Ionicons name="mic" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="learn"
-        options={{
-          title: 'Learn',
+          title: 'Path',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="school-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          title: 'Progress',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trending-up" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" color={color} size={size} />
+            <Ionicons name="trail-sign-outline" color={color} size={size} />
           ),
         }}
       />
