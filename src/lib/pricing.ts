@@ -6,9 +6,10 @@ const CHAT_PRICES: Record<string, { in: number; out: number }> = {
   'gpt-5.5': { in: 5, out: 30 },
   'gpt-5.5-pro': { in: 30, out: 180 },
   'gpt-5.4': { in: 2.5, out: 15 },
+  'gpt-5.4-mini': { in: 0.75, out: 4.5 },
   'gpt-5.4-nano': { in: 0.2, out: 1.25 },
 };
-const CHAT_FALLBACK = { in: 2.5, out: 15 };
+const CHAT_FALLBACK = { in: 0.75, out: 4.5 };
 
 // Transcription: USD per minute of audio.
 const TRANSCRIBE_PER_MIN: Record<string, number> = {

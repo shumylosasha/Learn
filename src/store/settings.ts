@@ -7,7 +7,10 @@ const PREFS_KEY = 'model_prefs_v1';
 
 export interface ModelPrefs {
   transcriptionModel: string;
-  analysisModel: string;
+  /** "Big-brain" tasks: analysing a recording's mistakes + building the path. */
+  smartModel: string;
+  /** High-frequency, simpler tasks: the practice/lesson chat + topic ideas. */
+  chatModel: string;
   ttsModel: string;
   ttsVoice: string;
   /** Auto-generate a cumulative review every N days (0 = manual only). */
@@ -17,10 +20,13 @@ export interface ModelPrefs {
 export const DEFAULT_PREFS: ModelPrefs = {
   // gpt-4o-transcribe is higher quality than whisper-1; both accept m4a.
   transcriptionModel: 'gpt-4o-transcribe',
-  // gpt-5.4 is the previous flagship: mid-tier price ($2.50/$15 per 1M vs
-  // gpt-5.5's $5/$30) and still supports the JSON-schema structured outputs
-  // this app requires. gpt-5.5 / gpt-5.5-pro are available for more quality.
-  analysisModel: 'gpt-5.4',
+  // Smart: accuracy matters here (wrong mistakes → bad lessons). gpt-5.4
+  // ($2.50/$15 per 1M) supports the JSON-schema outputs the analysis needs.
+  smartModel: 'gpt-5.4',
+  // Quick: the chat turns dominate token spend (history resent every turn), and
+  // marking answers / running drills is simple — gpt-5.4-mini ($0.75/$4.50) is
+  // ~3× cheaper. Bump to gpt-5.4 if you want a sharper tutor.
+  chatModel: 'gpt-5.4-mini',
   ttsModel: 'gpt-4o-mini-tts',
   ttsVoice: 'ash', // a clear, fairly neutral voice
   reviewCadenceDays: 7,
@@ -67,7 +73,10 @@ export const useSettings = create<SettingsState>((set, get) => ({
     let prefs = DEFAULT_PREFS;
     if (rawPrefs) {
       try {
-        prefs = { ...DEFAULT_PREFS, ...JSON.parse(rawPrefs) };
+        const parsed = JSON.parse(rawPrefs);
+        // Migrate the old single `analysisModel` into the new smart tier.
+        if (parsed.analysisModel && !parsed.smartModel) parsed.smartModel = parsed.analysisModel;
+        prefs = { ...DEFAULT_PREFS, ...parsed };
       } catch {
         /* keep defaults */
       }

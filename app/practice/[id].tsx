@@ -136,7 +136,7 @@ export default function PracticeScreen() {
         append(threadId, { id: uid(), role: 'user', content: text, createdAt: Date.now() });
         history.push({ role: 'user', content: text });
       }
-      const reply = await chatComplete(apiKey, history, prefs.analysisModel);
+      const reply = await chatComplete(apiKey, history, prefs.chatModel);
       append(threadId, { id: uid(), role: 'assistant', content: reply, createdAt: Date.now() });
     } catch (e) {
       append(threadId, {

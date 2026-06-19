@@ -26,7 +26,7 @@ export async function extendPathAfterRecording(sessionId: string): Promise<void>
     if (recurring.length === 0) return;
     const specs = await generateLearningPath(
       apiKey,
-      prefs.analysisModel,
+      prefs.smartModel,
       recurringMistakesContext(recurring, 12),
     );
     usePath.getState().addTopics(specs.slice(0, MAX_NEW_PER_BATCH), Date.now());
@@ -44,7 +44,7 @@ export async function generateMoreTopics(): Promise<number> {
   if (recurring.length === 0) return 0;
   const specs = await generateLearningPath(
     apiKey,
-    prefs.analysisModel,
+    prefs.smartModel,
     recurringMistakesContext(recurring, 12),
   );
   return usePath.getState().addTopics(specs.slice(0, MAX_NEW_PER_BATCH), Date.now());

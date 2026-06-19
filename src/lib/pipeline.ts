@@ -47,7 +47,7 @@ export async function processSession(sessionId: string): Promise<void> {
       apiKey,
       session.topic,
       transcript,
-      prefs.analysisModel,
+      prefs.smartModel,
     );
 
     store.setAnalysis(sessionId, analysis);

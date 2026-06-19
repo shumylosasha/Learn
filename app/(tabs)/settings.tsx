@@ -48,7 +48,7 @@ export default function SettingsScreen() {
     if (!k) return;
     setTesting(true);
     try {
-      await chatComplete(k, [{ role: 'user', content: 'Reply with the single word: ok' }], prefs.analysisModel);
+      await chatComplete(k, [{ role: 'user', content: 'Reply with the single word: ok' }], prefs.chatModel);
       Alert.alert('Working ✓', 'Your key and the analysis model are reachable.');
     } catch (e) {
       Alert.alert('Test failed', e instanceof Error ? e.message : 'Could not reach OpenAI.');
@@ -121,11 +121,22 @@ export default function SettingsScreen() {
             placeholder={DEFAULT_PREFS.transcriptionModel}
           />
           <ModelField
-            label="Analysis & tutor"
-            value={prefs.analysisModel}
-            onChange={(v) => setPrefs({ analysisModel: v })}
-            placeholder={DEFAULT_PREFS.analysisModel}
+            label="Smart model — analysis & lesson plan"
+            value={prefs.smartModel}
+            onChange={(v) => setPrefs({ smartModel: v })}
+            placeholder={DEFAULT_PREFS.smartModel}
           />
+          <ModelField
+            label="Quick model — chat & topic ideas"
+            value={prefs.chatModel}
+            onChange={(v) => setPrefs({ chatModel: v })}
+            placeholder={DEFAULT_PREFS.chatModel}
+          />
+          <Text style={styles.note}>
+            Heavy tasks (finding your mistakes, building the path) use the smart model; the
+            high-frequency chat uses the cheaper quick model. e.g. smart: gpt-5.4, quick:
+            gpt-5.4-mini (~3× cheaper). Use gpt-5.4 for both if you want maximum quality.
+          </Text>
           <ModelField
             label="Text-to-speech"
             value={prefs.ttsModel}

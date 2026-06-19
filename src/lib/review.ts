@@ -68,7 +68,7 @@ export async function generateReview(): Promise<Review | null> {
 
     const plan = await generateReviewPlan(
       apiKey,
-      prefs.analysisModel,
+      prefs.smartModel,
       periodSessions.length,
       trendsTable(trends),
       recurringMistakesContext(thisPeriod, 10),

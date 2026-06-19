@@ -68,7 +68,7 @@ export default function RecordScreen() {
     }
     setSuggesting(true);
     try {
-      const t = await generateTopic(apiKey, prefs.analysisModel);
+      const t = await generateTopic(apiKey, prefs.chatModel);
       if (t) setTopic(t);
     } catch (e) {
       Alert.alert('Could not suggest a topic', e instanceof Error ? e.message : 'Try again.');
