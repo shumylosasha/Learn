@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,58 +6,76 @@ import { categoryColor, colors, font, radius, spacing } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
 import { usePath, type PathLesson } from '@/store/path';
-import { dueCards, useCards } from '@/store/cards';
 import { useCoach } from '@/store/coach';
 import { computeStreak } from '@/lib/streak';
 import type { Session } from '@/types';
+
+type Item =
+  | { kind: 'record'; key: string }
+  | { kind: 'recording'; key: string; session: Session }
+  | { kind: 'lesson'; key: string; lesson: PathLesson }
+  | { kind: 'review'; key: string; session: Session };
 
 export default function HomeScreen() {
   const router = useRouter();
   const apiKey = useSettings((s) => s.apiKey);
   const sessions = useSessions((s) => s.sessions);
   const lessons = usePath((s) => s.lessons);
-  const load = usePath((s) => s.load);
-  const cards = useCards((s) => s.cards);
-  const loadCards = useCards((s) => s.load);
+  const loadPath = usePath((s) => s.load);
+
   const coach = useCoach((s) => s.insight);
   const coachGenerating = useCoach((s) => s.generating);
-  const loadCoach = useCoach((s) => s.load);
   const coachLoaded = useCoach((s) => s.loaded);
+  const loadCoach = useCoach((s) => s.load);
   const generateCoach = useCoach((s) => s.generate);
 
   useEffect(() => {
-    load();
-    loadCards();
+    loadPath();
     loadCoach();
-  }, [load, loadCards, loadCoach]);
+  }, [loadPath, loadCoach]);
 
   const analysed = sessions.filter((s) => s.analysis).length;
-
-  // Refresh the coach when there's enough new material (and it isn't running).
   useEffect(() => {
     if (!apiKey || !coachLoaded || coachGenerating) return;
-    const stale = !coach || analysed - coach.basis >= 2;
-    if (analysed >= 2 && stale) generateCoach();
+    if (analysed >= 2 && (!coach || analysed - coach.basis >= 2)) generateCoach();
   }, [apiKey, coachLoaded, coachGenerating, coach, analysed, generateCoach]);
 
-  const due = dueCards(cards).length;
   const streak = computeStreak(sessions);
-  const sessionsDesc = [...sessions].sort((a, b) => b.createdAt - a.createdAt);
-  const lessonsFor = (id: string) => lessons.filter((l) => l.sessionId === id);
 
-  // The single "what's next": the newest not-yet-done lesson.
-  const pending = [...lessons].filter((l) => l.status !== 'completed').sort((a, b) => b.createdAt - a.createdAt);
-  const next = pending[0];
+  // Build ONE ordered journey: Record → newest recording + its lessons + a
+  // review-its-mistakes step → older recordings…
+  const items = useMemo<Item[]>(() => {
+    const lessonsFor = (id: string) => lessons.filter((l) => l.sessionId === id);
+    const desc = [...sessions].sort((a, b) => b.createdAt - a.createdAt);
+    const out: Item[] = [{ kind: 'record', key: 'record' }];
+    for (const s of desc) {
+      out.push({ kind: 'recording', key: `rec_${s.id}`, session: s });
+      for (const l of lessonsFor(s.id)) out.push({ kind: 'lesson', key: l.id, lesson: l });
+      if ((s.analysis?.mistakes.length ?? 0) > 0) out.push({ kind: 'review', key: `rev_${s.id}`, session: s });
+    }
+    return out;
+  }, [sessions, lessons]);
 
-  const gear = () => (
-    <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
-      <Ionicons name="settings-outline" size={22} color={colors.text} />
-    </Pressable>
-  );
+  const nextLessonId = items.find((i) => i.kind === 'lesson' && i.lesson.status !== 'completed')?.key;
+
+  const open = (it: Item) => {
+    if (it.kind === 'record') router.push('/record');
+    else if (it.kind === 'recording') router.push(`/session/${it.session.id}`);
+    else if (it.kind === 'lesson') router.push(`/practice/${it.lesson.id}`);
+    else router.push(`/flashcards/${it.session.id}`);
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Stack.Screen options={{ headerLeft: gear }} />
+      <Stack.Screen
+        options={{
+          headerLeft: () => (
+            <Pressable onPress={() => router.push('/settings')} hitSlop={10}>
+              <Ionicons name="settings-outline" size={22} color={colors.text} />
+            </Pressable>
+          ),
+        }}
+      />
 
       {!apiKey && (
         <Pressable onPress={() => router.push('/settings')}>
@@ -68,186 +86,137 @@ export default function HomeScreen() {
         </Pressable>
       )}
 
-      {streak.current > 0 && (
-        <Text style={styles.streak}>🔥 {streak.current}-day streak</Text>
-      )}
+      {streak.current > 0 && <Text style={styles.streak}>🔥 {streak.current}-day streak</Text>}
 
-      {due > 0 && (
-        <Pressable onPress={() => router.push('/review')} style={styles.reviewBanner}>
-          <Text style={styles.reviewText}>🃏 {due} card{due === 1 ? '' : 's'} to review</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-        </Pressable>
-      )}
+      <View>
+        {items.map((it, i) => (
+          <Row
+            key={it.key}
+            item={it}
+            isLast={i === items.length - 1}
+            isNext={it.key === nextLessonId || (!nextLessonId && it.kind === 'record')}
+            onPress={() => open(it)}
+          />
+        ))}
+      </View>
 
-      {/* ── The single clear next step ───────────────────────────── */}
-      {next ? (
-        <Pressable
-          onPress={() => router.push(`/practice/${next.id}`)}
-          style={({ pressed }) => [styles.hero, pressed && { opacity: 0.92 }]}
-        >
-          <Text style={styles.heroKicker}>NEXT LESSON</Text>
-          <Text style={styles.heroTitle}>{next.title}</Text>
-          <View style={styles.heroBtn}>
-            <Ionicons name="play" size={18} color={colors.accent} />
-            <Text style={styles.heroBtnText}>Start</Text>
-          </View>
-        </Pressable>
-      ) : (
-        <Pressable
-          onPress={() => router.push('/record')}
-          style={({ pressed }) => [styles.hero, pressed && { opacity: 0.92 }]}
-        >
-          <Text style={styles.heroKicker}>
-            {sessions.length === 0 ? 'START HERE' : "YOU'RE ALL CAUGHT UP"}
-          </Text>
-          <Text style={styles.heroTitle}>
-            {sessions.length === 0 ? 'Record your first clip' : 'Record today’s clip'}
-          </Text>
-          <View style={styles.heroBtn}>
-            <Ionicons name="mic" size={18} color={colors.accent} />
-            <Text style={styles.heroBtnText}>Record</Text>
-          </View>
-        </Pressable>
-      )}
-
-      {/* A smaller record button is always available when there ARE lessons. */}
-      {next && (
-        <Pressable onPress={() => router.push('/record')} style={styles.recordLink}>
-          <Ionicons name="mic-outline" size={16} color={colors.accent} />
-          <Text style={styles.recordLinkText}>Record a new clip</Text>
-        </Pressable>
-      )}
-
-      {/* ── Coach: progress read + what to record next ───────────── */}
-      {coach && (
-        <View style={styles.coach}>
-          <View style={styles.coachHead}>
-            <Text style={styles.coachTitle}>📈 Your coach</Text>
-            <Text style={styles.coachLevel}>Level {coach.level}</Text>
-          </View>
-          <Text style={styles.coachSummary}>{coach.summary}</Text>
-          {coach.suggestedTopics.length > 0 && (
-            <>
-              <Text style={styles.coachSub}>Try recording next</Text>
-              {coach.suggestedTopics.slice(0, 3).map((t, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => router.push({ pathname: '/record', params: { topic: t.title } })}
-                  style={({ pressed }) => [styles.suggestRow, pressed && { opacity: 0.85 }]}
-                >
-                  <Ionicons name="mic-outline" size={15} color={colors.accent} />
-                  <Text style={styles.suggestText} numberOfLines={2}>
-                    {t.title}
-                  </Text>
-                </Pressable>
-              ))}
-            </>
-          )}
-        </View>
-      )}
-      {coachGenerating && !coach && (
-        <Text style={styles.coachLoading}>Reading your overall progress…</Text>
-      )}
-
-      {/* ── History: each recording and its lessons ──────────────── */}
-      {sessionsDesc.length > 0 && (
-        <View style={{ gap: spacing.lg, marginTop: spacing.sm }}>
-          <Text style={styles.historyHead}>Your recordings</Text>
-          {sessionsDesc.map((s) => (
-            <RecordingGroup
-              key={s.id}
-              session={s}
-              lessons={lessonsFor(s.id)}
-              nextId={next?.id}
-              onOpenRecording={() => router.push(`/session/${s.id}`)}
-              onOpenLesson={(id) => router.push(`/practice/${id}`)}
-            />
-          ))}
-        </View>
-      )}
+      {/* Secondary: the AI coach (progress + what to record next) */}
+      <Pressable
+        onPress={() => router.push('/coach')}
+        style={({ pressed }) => [styles.coachBtn, pressed && { opacity: 0.85 }]}
+      >
+        <Ionicons name="sparkles" size={16} color={colors.accent} />
+        <Text style={styles.coachBtnText}>
+          {coach ? 'Coach · progress & topics to try' : coachGenerating ? 'Coach is reading your progress…' : 'Coach · suggestions appear after a few clips'}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+      </Pressable>
     </ScrollView>
   );
 }
 
-function RecordingGroup({
-  session,
-  lessons,
-  nextId,
-  onOpenRecording,
-  onOpenLesson,
+function Row({
+  item,
+  isLast,
+  isNext,
+  onPress,
 }: {
-  session: Session;
-  lessons: PathLesson[];
-  nextId?: string;
-  onOpenRecording: () => void;
-  onOpenLesson: (id: string) => void;
+  item: Item;
+  isLast: boolean;
+  isNext: boolean;
+  onPress: () => void;
 }) {
-  const date = new Date(session.createdAt).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  const done = lessons.filter((l) => l.status === 'completed').length;
-  const processing = session.status === 'transcribing' || session.status === 'analyzing';
+  const done = item.kind === 'lesson' && item.lesson.status === 'completed';
+
+  let circleColor = colors.accent;
+  let icon: keyof typeof Ionicons.glyphMap = 'ellipse';
+  if (item.kind === 'record') icon = 'mic';
+  else if (item.kind === 'recording') {
+    icon = 'radio-button-on';
+    circleColor = colors.textMuted;
+  } else if (item.kind === 'lesson') {
+    icon = done ? 'checkmark' : 'book';
+    circleColor = done ? colors.success : categoryColor(item.lesson.category);
+  } else {
+    icon = 'albums';
+    circleColor = colors.warning;
+  }
 
   return (
-    <View style={styles.group}>
-      <Pressable onPress={onOpenRecording} style={styles.groupHead}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.groupDate}>{date}</Text>
-          <Text style={styles.groupTopic} numberOfLines={2}>
-            {session.topic}
-          </Text>
-        </View>
-        <Text style={styles.groupMeta}>
-          {processing
-            ? 'Analysing…'
-            : session.status === 'error'
-              ? 'Error'
-              : lessons.length > 0
-                ? `${done}/${lessons.length}`
-                : 'See mistakes'}
-        </Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
-      </Pressable>
+    <View style={styles.row}>
+      <View style={styles.rail}>
+        {item.kind === 'recording' || item.kind === 'record' ? (
+          <View style={[styles.milestone, { backgroundColor: circleColor }]}>
+            <Ionicons name={icon} size={18} color={colors.accentText} />
+          </View>
+        ) : (
+          <View style={[styles.dot, { backgroundColor: circleColor }, isNext && styles.dotNext]}>
+            <Ionicons name={icon} size={13} color={colors.accentText} />
+          </View>
+        )}
+        {!isLast && <View style={styles.connector} />}
+      </View>
 
-      {lessons.map((l) => {
-        const isDone = l.status === 'completed';
-        const isNext = l.id === nextId;
-        return (
-          <Pressable
-            key={l.id}
-            onPress={() => onOpenLesson(l.id)}
-            style={({ pressed }) => [styles.lessonRow, isNext && styles.lessonRowNext, pressed && { opacity: 0.85 }]}
-          >
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: isDone ? colors.success : categoryColor(l.category) },
-              ]}
-            >
-              {isDone ? (
-                <Ionicons name="checkmark" size={13} color={colors.accentText} />
-              ) : (
-                <Ionicons name="book-outline" size={12} color={colors.accentText} />
-              )}
-            </View>
-            <Text style={[styles.lessonTitle, isDone && styles.lessonTitleDone]} numberOfLines={1}>
-              {l.title}
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.card,
+          item.kind === 'recording' && styles.cardRecording,
+          item.kind === 'record' && styles.cardRecord,
+          isNext && styles.cardNext,
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          {item.kind === 'record' && (
+            <>
+              <Text style={styles.recordTitle}>Record a new clip</Text>
+              <Text style={styles.recordSub}>Speak → I’ll build your next lessons</Text>
+            </>
+          )}
+          {item.kind === 'recording' && (
+            <>
+              <Text style={styles.recDate}>
+                {new Date(item.session.createdAt).toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                })}
+                {item.session.status === 'transcribing' || item.session.status === 'analyzing'
+                  ? ' · analysing…'
+                  : ''}
+              </Text>
+              <Text style={styles.recTopic} numberOfLines={2}>
+                {item.session.topic}
+              </Text>
+            </>
+          )}
+          {item.kind === 'lesson' && (
+            <Text style={[styles.lessonTitle, done && styles.lessonDone]} numberOfLines={2}>
+              {item.lesson.title}
             </Text>
-            {isNext && <Text style={styles.nextTag}>NEXT</Text>}
-            <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
-          </Pressable>
-        );
-      })}
+          )}
+          {item.kind === 'review' && (
+            <Text style={styles.reviewTitle}>
+              Review these mistakes ({item.session.analysis?.mistakes.length} cards)
+            </Text>
+          )}
+        </View>
 
-      {!processing && session.analysis && lessons.length === 0 && (
-        <Text style={styles.preparing}>Preparing lessons…</Text>
-      )}
+        {isNext && item.kind === 'lesson' ? (
+          <View style={styles.startPill}>
+            <Ionicons name="play" size={13} color={colors.accentText} />
+            <Text style={styles.startText}>Start</Text>
+          </View>
+        ) : (
+          <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+        )}
+      </Pressable>
     </View>
   );
 }
 
+const RAIL = 44;
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   warn: {
@@ -262,106 +231,70 @@ const styles = StyleSheet.create({
   },
   warnText: { color: colors.warning, fontSize: font.small, flex: 1 },
   streak: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
-  reviewBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-  },
-  reviewText: { color: colors.accent, fontSize: font.small, fontWeight: '800' },
-  coach: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  coachHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  coachTitle: { color: colors.text, fontSize: font.body, fontWeight: '800' },
-  coachLevel: { color: colors.textMuted, fontSize: font.tiny, fontWeight: '700' },
-  coachSummary: { color: colors.text, fontSize: font.small, lineHeight: 21 },
-  coachSub: {
-    color: colors.textMuted,
-    fontSize: font.tiny,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: spacing.xs,
-  },
-  suggestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    padding: spacing.sm + 2,
-  },
-  suggestText: { color: colors.text, fontSize: font.small, flex: 1, lineHeight: 19 },
-  coachLoading: { color: colors.textFaint, fontSize: font.tiny, fontStyle: 'italic', textAlign: 'center' },
-  hero: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  heroKicker: { color: colors.accentText, fontSize: font.tiny, fontWeight: '800', letterSpacing: 1, opacity: 0.85 },
-  heroTitle: { color: colors.accentText, fontSize: font.h2, fontWeight: '800', lineHeight: 28 },
-  heroSub: { color: colors.accentText, fontSize: font.small, opacity: 0.85 },
-  heroBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: colors.accentText,
-    borderRadius: radius.pill,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.xs,
-  },
-  heroBtnText: { color: colors.accent, fontSize: font.body, fontWeight: '800' },
-  recordLink: {
-    flexDirection: 'row',
+
+  row: { flexDirection: 'row', gap: spacing.sm },
+  rail: { width: RAIL, alignItems: 'center' },
+  milestone: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
   },
-  recordLinkText: { color: colors.accent, fontSize: font.small, fontWeight: '700' },
-  historyHead: {
-    color: colors.textMuted,
-    fontSize: font.tiny,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+  dot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
   },
-  group: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  groupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  groupDate: { color: colors.textFaint, fontSize: font.tiny, fontWeight: '700', textTransform: 'uppercase' },
-  groupTopic: { color: colors.text, fontSize: font.body, fontWeight: '700', lineHeight: 21, marginTop: 1 },
-  groupMeta: { color: colors.textMuted, fontSize: font.tiny, fontWeight: '700' },
-  lessonRow: {
+  dotNext: { borderWidth: 3, borderColor: colors.accentSoft },
+  connector: { width: 2, flex: 1, backgroundColor: colors.border, marginVertical: 2 },
+
+  card: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
-    padding: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
   },
-  lessonRowNext: { borderWidth: 1.5, borderColor: colors.accent },
-  dot: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  lessonTitle: { color: colors.text, fontSize: font.small, fontWeight: '600', flex: 1 },
-  lessonTitleDone: { color: colors.textMuted },
-  nextTag: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  preparing: { color: colors.textFaint, fontSize: font.tiny, fontStyle: 'italic' },
+  cardRecord: { backgroundColor: colors.accent, borderColor: colors.accent },
+  cardRecording: { backgroundColor: colors.surfaceAlt },
+  cardNext: { borderColor: colors.accent, borderWidth: 2 },
+
+  recordTitle: { color: colors.accentText, fontSize: font.body, fontWeight: '800' },
+  recordSub: { color: colors.accentText, fontSize: font.tiny, opacity: 0.85 },
+  recDate: { color: colors.textFaint, fontSize: font.tiny, fontWeight: '700', textTransform: 'uppercase' },
+  recTopic: { color: colors.text, fontSize: font.body, fontWeight: '700', lineHeight: 21 },
+  lessonTitle: { color: colors.text, fontSize: font.small, fontWeight: '600', lineHeight: 19 },
+  lessonDone: { color: colors.textMuted },
+  reviewTitle: { color: colors.text, fontSize: font.small, fontWeight: '600' },
+  startPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    paddingVertical: 5,
+    paddingHorizontal: spacing.md,
+  },
+  startText: { color: colors.accentText, fontSize: font.small, fontWeight: '800' },
+
+  coachBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  coachBtnText: { color: colors.accent, fontSize: font.small, fontWeight: '700', flex: 1 },
 });
