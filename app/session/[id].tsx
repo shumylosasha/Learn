@@ -12,7 +12,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { AudioPlayer } from 'expo-audio';
 import { Button, Card, Empty, Pill, SectionTitle } from '@/components/ui';
-import { categoryColor, colors, font, radius, severityColor, spacing } from '@/theme';
+import { categoryColor, font, type Palette, radius, severityColor, spacing, useColors } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { usePath } from '@/store/path';
 import { generateLessonsForSession } from '@/lib/path';
@@ -26,6 +26,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function SessionScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useSessions((s) => s.sessions.find((x) => x.id === id));
@@ -164,6 +166,8 @@ export default function SessionScreen() {
 }
 
 function PlayButton({ uri }: { uri: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [sound, setSound] = useState<AudioPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -200,6 +204,8 @@ function PlayButton({ uri }: { uri: string }) {
 }
 
 function MistakeCard({ mistake }: { mistake: Mistake }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Card style={{ gap: spacing.sm }}>
       <View style={styles.mistakeHeader}>
@@ -220,7 +226,8 @@ function MistakeCard({ mistake }: { mistake: Mistake }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   date: { color: colors.textMuted, fontSize: font.small },
@@ -250,4 +257,4 @@ const styles = StyleSheet.create({
   transToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
   transToggleText: { color: colors.textMuted, fontSize: font.small, fontWeight: '600' },
   transcript: { color: colors.textMuted, fontSize: font.body, lineHeight: 24, fontStyle: 'italic' },
-});
+  });

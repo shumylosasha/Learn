@@ -1,20 +1,40 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Empty, Pill } from '@/components/ui';
-import { categoryColor, colors, font, radius, spacing } from '@/theme';
+import { categoryColor, font, type Palette, radius, spacing, useColors } from '@/theme';
 import { useSessions } from '@/store/sessions';
+import { useReviewed } from '@/store/reviewed';
 import type { Mistake } from '@/types';
 
 export default function RecordingFlashcardsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = useSessions((s) => s.sessions.find((x) => x.id === id));
   const mistakes = useMemo(() => session?.analysis?.mistakes ?? [], [session]);
+  const loadReviewed = useReviewed((s) => s.load);
+  const markReviewed = useReviewed((s) => s.markReviewed);
 
   const [queue, setQueue] = useState<number[]>(() => mistakes.map((_, i) => i));
   const [flipped, setFlipped] = useState(false);
+
+  useEffect(() => {
+    loadReviewed();
+  }, [loadReviewed]);
+
+  // Mark this recording's deck as reviewed once the learner reaches the end.
+  const done = queue.length === 0;
+  useEffect(() => {
+    if (id && mistakes.length > 0 && done) markReviewed(id);
+  }, [id, mistakes.length, done, markReviewed]);
+
+  const finish = () => {
+    if (id) markReviewed(id);
+    router.back();
+  };
 
   if (mistakes.length === 0) {
     return (
@@ -25,8 +45,8 @@ export default function RecordingFlashcardsScreen() {
     );
   }
 
-  const done = queue.length === 0;
   const current: Mistake | undefined = done ? undefined : mistakes[queue[0]];
+  const reviewedCount = mistakes.length - queue.length;
 
   const next = (gotIt: boolean) => {
     setQueue((q) => (gotIt ? q.slice(1) : [...q.slice(1), q[0]]));
@@ -35,7 +55,17 @@ export default function RecordingFlashcardsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Review mistakes' }} />
+      <Stack.Screen
+        options={{
+          title: 'Review mistakes',
+          headerRight: () =>
+            done ? null : (
+              <Pressable onPress={finish} hitSlop={10} style={styles.finishBtn}>
+                <Text style={styles.finishText}>Finish</Text>
+              </Pressable>
+            ),
+        }}
+      />
       <Text style={styles.counter}>{done ? 'Done' : `${queue.length} to go`}</Text>
 
       {done ? (
@@ -83,15 +113,25 @@ export default function RecordingFlashcardsScreen() {
               <Text style={styles.revealText}>Reveal answer</Text>
             </Pressable>
           )}
+
+          {reviewedCount > 0 && (
+            <Pressable onPress={finish} style={styles.completeBtn}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
+              <Text style={styles.completeText}>Complete review</Text>
+            </Pressable>
+          )}
         </>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.md },
   counter: { color: colors.textMuted, fontSize: font.small, textAlign: 'center' },
+  finishBtn: { paddingHorizontal: spacing.sm },
+  finishText: { color: colors.accent, fontSize: font.body, fontWeight: '700' },
   card: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.lg },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardType: { color: colors.textMuted, fontSize: font.small, fontWeight: '700', flex: 1 },
@@ -105,6 +145,8 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: spacing.sm },
   revealBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   revealText: { color: colors.accent, fontSize: font.body, fontWeight: '700' },
+  completeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  completeText: { color: colors.success, fontSize: font.small, fontWeight: '700' },
   doneWrap: { alignItems: 'center', gap: spacing.md, paddingTop: spacing.xl },
   doneEmoji: { fontSize: 48 },
   doneTitle: { color: colors.text, fontSize: font.h3, fontWeight: '800', textAlign: 'center' },

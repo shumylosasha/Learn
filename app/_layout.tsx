@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useColorScheme } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -6,24 +7,31 @@ import { useSettings } from '@/store/settings';
 import { useSessions } from '@/store/sessions';
 import { usePath } from '@/store/path';
 import { useUsage } from '@/store/usage';
-import { colors } from '@/theme';
+import { useThemeStore } from '@/store/theme';
+import { useColors } from '@/theme';
 
 export default function RootLayout() {
   const loadSettings = useSettings((s) => s.load);
   const loadSessions = useSessions((s) => s.load);
   const loadPath = usePath((s) => s.load);
   const loadUsage = useUsage((s) => s.load);
+  const loadTheme = useThemeStore((s) => s.load);
+
+  const colors = useColors();
+  const mode = useThemeStore((s) => s.mode);
+  const system = useColorScheme();
+  const resolved = mode === 'system' ? system ?? 'light' : mode;
 
   useEffect(() => {
     (async () => {
       // Load core stores up front. Practice threads load lazily, keyed by id.
-      await Promise.all([loadSettings(), loadSessions(), loadPath(), loadUsage()]);
+      await Promise.all([loadTheme(), loadSettings(), loadSessions(), loadPath(), loadUsage()]);
     })();
-  }, [loadSettings, loadSessions, loadPath, loadUsage]);
+  }, [loadTheme, loadSettings, loadSessions, loadPath, loadUsage]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StatusBar style="dark" />
+      <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },

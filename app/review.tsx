@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Empty, Pill } from '@/components/ui';
-import { categoryColor, colors, font, radius, spacing } from '@/theme';
+import { categoryColor, font, type Palette, radius, spacing, useColors } from '@/theme';
 import { dueCards, useCards } from '@/store/cards';
 
 export default function ReviewScreen() {
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const cards = useCards((s) => s.cards);
   const load = useCards((s) => s.load);
   const grade = useCards((s) => s.grade);
@@ -98,7 +100,8 @@ export default function ReviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.md },
   counter: { color: colors.textMuted, fontSize: font.small, textAlign: 'center' },
   card: {

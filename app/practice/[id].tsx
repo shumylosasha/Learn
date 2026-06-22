@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { AudioPlayer } from 'expo-audio';
 import { Button, Empty } from '@/components/ui';
 import { MarkdownText, parseOptions } from '@/components/Markdown';
-import { colors, font, radius, spacing } from '@/theme';
+import { font, type Palette, radius, spacing, useColors } from '@/theme';
 import { useSessions } from '@/store/sessions';
 import { useSettings } from '@/store/settings';
 import { useReviews } from '@/store/reviews';
@@ -53,6 +53,8 @@ function uid() {
 }
 
 export default function PracticeScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const threadId = id ?? GLOBAL_PRACTICE_ID;
   const router = useRouter();
@@ -309,6 +311,8 @@ function Bubble({
   interactive?: boolean;
   onSelectOption?: (label: string) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isUser = message.role === 'user';
   const [loadingTts, setLoadingTts] = useState(false);
   const soundRef = useRef<AudioPlayer | null>(null);
@@ -368,7 +372,8 @@ function Bubble({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   chat: {
     padding: spacing.lg,
     gap: spacing.md,

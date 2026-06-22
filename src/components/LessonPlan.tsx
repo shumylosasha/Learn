@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from './ui';
-import { colors, font, radius, spacing } from '@/theme';
+import { font, type Palette, radius, spacing, useColors } from '@/theme';
 import type { Exercise, LessonStep } from '@/types';
 
 export function LessonPlan({ steps }: { steps: LessonStep[] }) {
@@ -25,6 +25,8 @@ function LessonCard({
   defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Card>
       <Pressable style={styles.header} onPress={() => setOpen((o) => !o)}>
@@ -48,6 +50,8 @@ function LessonCard({
 
 function ExerciseItem({ exercise, number }: { exercise: Exercise; number: number }) {
   const [revealed, setRevealed] = useState(false);
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const kindLabel = exercise.kind.replace('_', ' ');
   return (
     <View style={styles.exercise}>
@@ -77,7 +81,8 @@ function ExerciseItem({ exercise, number }: { exercise: Exercise; number: number
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center' },
   index: { color: colors.success, fontSize: font.tiny, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.text, fontSize: font.h3, fontWeight: '700', marginTop: 2 },

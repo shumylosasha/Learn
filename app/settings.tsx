@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Label, SectionTitle } from '@/components/ui';
-import { colors, font, radius, spacing } from '@/theme';
+import { font, type Palette, radius, spacing, useColors } from '@/theme';
 import { DEFAULT_PREFS, TTS_VOICES, useSettings } from '@/store/settings';
+import { type ThemeMode, useThemeStore } from '@/store/theme';
 import { chatComplete } from '@/api/openai';
 import { summarizeUsage, useUsage } from '@/store/usage';
 import { formatUsd } from '@/lib/pricing';
 
+const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
 export default function SettingsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { apiKey, prefs, setApiKey, clearApiKey, setPrefs, loaded } = useSettings();
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
   const usage = useUsage();
   const loadUsage = useUsage((s) => s.load);
   const [keyInput, setKeyInput] = useState('');
@@ -107,6 +118,37 @@ export default function SettingsScreen() {
           <Text style={styles.note}>
             Your key is stored only on this device (in the secure keychain) and sent directly to
             OpenAI. There is no server in between.
+          </Text>
+        </Card>
+      </View>
+
+      <View>
+        <SectionTitle>Appearance</SectionTitle>
+        <Card style={{ gap: spacing.md }}>
+          <Label>Theme</Label>
+          <View style={styles.voiceRow}>
+            {THEME_OPTIONS.map((opt) => (
+              <Pressable
+                key={opt.value}
+                onPress={() => setThemeMode(opt.value)}
+                style={[
+                  styles.voiceChip,
+                  themeMode === opt.value && { backgroundColor: colors.accent, borderColor: colors.accent },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.voiceText,
+                    themeMode === opt.value && { color: colors.accentText },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.note}>
+            “System” follows your device’s light/dark setting.
           </Text>
         </Card>
       </View>
@@ -223,6 +265,8 @@ function formatTokens(n: number): string {
 }
 
 function UsageRow({ label, detail, cost }: { label: string; detail: string; cost: number }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.usageRow}>
       <Text style={styles.usageLabel}>{label}</Text>
@@ -243,6 +287,8 @@ function ModelField({
   onChange: (v: string) => void;
   placeholder: string;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View>
       <Label>{label}</Label>
@@ -259,7 +305,8 @@ function ModelField({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   screenTitle: { color: colors.text, fontSize: font.h1, fontWeight: '800' },
   status: { color: colors.textMuted, fontSize: font.small },

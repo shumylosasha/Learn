@@ -1,14 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Empty, Pill, SectionTitle } from '@/components/ui';
-import { colors, font, radius, spacing } from '@/theme';
+import { font, type Palette, radius, spacing, useColors } from '@/theme';
 import { useCoach } from '@/store/coach';
 import { dueCards, useCards } from '@/store/cards';
 
 export default function CoachScreen() {
   const router = useRouter();
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insight = useCoach((s) => s.insight);
   const generating = useCoach((s) => s.generating);
   const loadCoach = useCoach((s) => s.load);
@@ -108,6 +110,8 @@ export default function CoachScreen() {
 }
 
 function Row({ label, items, color }: { label: string; items: string[]; color: string }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={{ gap: spacing.xs }}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -120,7 +124,8 @@ function Row({ label, items, color }: { label: string; items: string[]; color: s
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   container: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
   reviewCard: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,7 +9,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { colors, font, radius, spacing } from '@/theme';
+import { font, type Palette, radius, spacing, useColors } from '@/theme';
 
 export function Card({
   children,
@@ -18,10 +18,14 @@ export function Card({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
@@ -40,12 +44,14 @@ export function Button({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const isDisabled = disabled || loading;
   const palette: Record<string, { bg: string; fg: string; border?: string }> = {
-    primary: { bg: colors.accent, fg: colors.accentText },
-    secondary: { bg: colors.surfaceAlt, fg: colors.text, border: colors.border },
-    ghost: { bg: 'transparent', fg: colors.textMuted },
-    danger: { bg: 'transparent', fg: colors.danger, border: colors.danger },
+    primary: { bg: c.accent, fg: c.accentText },
+    secondary: { bg: c.surfaceAlt, fg: c.text, border: c.border },
+    ghost: { bg: 'transparent', fg: c.textMuted },
+    danger: { bg: 'transparent', fg: c.danger, border: c.danger },
   };
   const p = palette[variant];
   return (
@@ -74,23 +80,26 @@ export function Button({
 
 export function Pill({
   label,
-  color = colors.textMuted,
+  color,
   filled,
 }: {
   label: string;
   color?: string;
   filled?: boolean;
 }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const tint = color ?? c.textMuted;
   return (
     <View
       style={[
         styles.pill,
         filled
-          ? { backgroundColor: color }
-          : { borderColor: color, borderWidth: 1, backgroundColor: 'transparent' },
+          ? { backgroundColor: tint }
+          : { borderColor: tint, borderWidth: 1, backgroundColor: 'transparent' },
       ]}
     >
-      <Text style={[styles.pillText, { color: filled ? colors.bg : color }]}>{label}</Text>
+      <Text style={[styles.pillText, { color: filled ? c.bg : tint }]}>{label}</Text>
     </View>
   );
 }
@@ -102,6 +111,8 @@ export function Empty({
   title: string;
   subtitle?: string;
 }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={styles.empty}>
       <Text style={styles.emptyTitle}>{title}</Text>
@@ -111,67 +122,70 @@ export function Empty({
 }
 
 export function Label({ children, style }: { children: React.ReactNode; style?: TextStyle }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return <Text style={[styles.label, style]}>{children}</Text>;
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sectionTitle: {
-    color: colors.textMuted,
-    fontSize: font.tiny,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: spacing.sm,
-  },
-  button: {
-    borderRadius: radius.md,
-    paddingVertical: spacing.md + 2,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    fontSize: font.body,
-    fontWeight: '700',
-  },
-  pill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    alignSelf: 'flex-start',
-  },
-  pillText: {
-    fontSize: font.tiny,
-    fontWeight: '700',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-    paddingHorizontal: spacing.lg,
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: font.h3,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptySub: {
-    color: colors.textMuted,
-    fontSize: font.small,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 20,
-  },
-  label: {
-    color: colors.textMuted,
-    fontSize: font.small,
-    marginBottom: spacing.xs,
-  },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    sectionTitle: {
+      color: colors.textMuted,
+      fontSize: font.tiny,
+      fontWeight: '700',
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginBottom: spacing.sm,
+    },
+    button: {
+      borderRadius: radius.md,
+      paddingVertical: spacing.md + 2,
+      paddingHorizontal: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonText: {
+      fontSize: font.body,
+      fontWeight: '700',
+    },
+    pill: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 4,
+      borderRadius: radius.pill,
+      alignSelf: 'flex-start',
+    },
+    pillText: {
+      fontSize: font.tiny,
+      fontWeight: '700',
+    },
+    empty: {
+      alignItems: 'center',
+      paddingVertical: spacing.xxl,
+      paddingHorizontal: spacing.lg,
+    },
+    emptyTitle: {
+      color: colors.text,
+      fontSize: font.h3,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    emptySub: {
+      color: colors.textMuted,
+      fontSize: font.small,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      lineHeight: 20,
+    },
+    label: {
+      color: colors.textMuted,
+      fontSize: font.small,
+      marginBottom: spacing.xs,
+    },
+  });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 import { Button, Card, SectionTitle } from '@/components/ui';
-import { colors, font, radius, spacing } from '@/theme';
+import { font, type Palette, radius, spacing, useColors } from '@/theme';
 import { TOPIC_GROUPS, randomTopic } from '@/lib/topics';
 import {
   cancelRecording,
@@ -35,6 +35,8 @@ function tap() {
 }
 
 export default function RecordScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
   const apiKey = useSettings((s) => s.apiKey);
@@ -210,6 +212,8 @@ const WAVE_BARS = 28;
 
 /** A live audio-level waveform: bars scroll right-to-left, heights track the mic. */
 function Waveform() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [levels, setLevels] = useState<number[]>(() => new Array(WAVE_BARS).fill(0));
 
   useEffect(() => {
@@ -251,6 +255,8 @@ function ToolButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable
       onPress={onPress}
@@ -277,6 +283,8 @@ function CustomTopicModal({
   onClose: () => void;
   onSave: (topic: string) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [text, setText] = useState(initial);
 
   // Reset the field to the current topic each time the sheet opens.
@@ -332,6 +340,8 @@ function TopicPicker({
   onClose: () => void;
   onPick: (topic: string) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -367,7 +377,8 @@ function TopicPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
   container: {
     padding: spacing.lg,
     gap: spacing.md,

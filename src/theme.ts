@@ -1,6 +1,26 @@
-// A clean, light design system. Off-white canvas, near-black text, indigo accent.
+// Two palettes — a clean light theme and a deep, comfortable dark theme — sharing
+// the same keys so any component can theme itself by reading `useColors()`.
+import { useColorScheme } from 'react-native';
+import { useThemeStore } from '@/store/theme';
 
-export const colors = {
+export interface Palette {
+  bg: string;
+  surface: string;
+  surfaceAlt: string;
+  border: string;
+  text: string;
+  textMuted: string;
+  textFaint: string;
+  accent: string;
+  accentSoft: string;
+  accentText: string;
+  danger: string;
+  warning: string;
+  success: string;
+  user: string;
+}
+
+export const lightColors: Palette = {
   bg: '#F6F7F9', // app canvas — soft off-white
   surface: '#FFFFFF', // cards
   surfaceAlt: '#EDF0F4', // pills, alt rows, subtle fills
@@ -16,6 +36,34 @@ export const colors = {
   success: '#059669',
   user: '#E5E9FD',
 };
+
+export const darkColors: Palette = {
+  bg: '#0E1116', // deep slate canvas
+  surface: '#171B22', // cards
+  surfaceAlt: '#222834', // pills, alt rows, subtle fills
+  border: '#2A313C',
+  text: '#F2F4F8', // near-white
+  textMuted: '#9AA5B3',
+  textFaint: '#69727F',
+  accent: '#818CF8', // lighter indigo reads better on dark
+  accentSoft: '#2A3157', // muted indigo for soft fills / chat bubbles
+  accentText: '#FFFFFF',
+  danger: '#F87171',
+  warning: '#FBBF24',
+  success: '#34D399',
+  user: '#2A3157',
+};
+
+// A static default (light) for non-component code and helper fallbacks.
+export const colors = lightColors;
+
+/** The active palette for the current theme. Call inside a component. */
+export function useColors(): Palette {
+  const system = useColorScheme();
+  const mode = useThemeStore((s) => s.mode);
+  const resolved = mode === 'system' ? system ?? 'light' : mode;
+  return resolved === 'dark' ? darkColors : lightColors;
+}
 
 export const severityColor = (severity: number) => {
   if (severity >= 3) return colors.danger;

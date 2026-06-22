@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleProp, StyleSheet, Text, TextStyle } from 'react-native';
-import { colors, font } from '@/theme';
+import { font, type Palette, useColors } from '@/theme';
 
 // Matches inline markdown spans: **bold**, __bold__, *italic*, _italic_, `code`.
 const INLINE = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|`[^`]+`)/g;
@@ -18,6 +18,8 @@ export function MarkdownText({
   content: string;
   style?: StyleProp<TextStyle>;
 }) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const parts = content.split(INLINE).filter((p) => p.length > 0);
   return (
     <Text style={style}>
@@ -86,12 +88,13 @@ export function parseOptions(content: string): ParsedOption[] {
   return out.length >= 2 ? out : [];
 }
 
-const styles = StyleSheet.create({
-  bold: { fontWeight: '700', color: colors.text },
-  italic: { fontStyle: 'italic' },
-  code: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    backgroundColor: colors.surfaceAlt,
-    fontSize: font.small,
-  },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    bold: { fontWeight: '700', color: colors.text },
+    italic: { fontStyle: 'italic' },
+    code: {
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      backgroundColor: colors.surfaceAlt,
+      fontSize: font.small,
+    },
+  });
