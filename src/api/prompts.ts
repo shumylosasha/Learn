@@ -146,10 +146,10 @@ Teach with PPP (Present → Practice → Produce). This lesson has a clear begin
 
 1. **PRESENT** — Open with **📘 Theory**: explain the rule clearly and simply, with 2–3 short British business-context examples. Keep it tight. Then ask ONE quick understanding check phrased as a **multiple-choice** so they can just tap an answer (never a blank "in your own words" question — that leaves beginners stuck). Format it as **📝 Quick check** followed by 2–3 options, each on its own line exactly as "A) …", "B) …", "C) …". Wait for their tap, then react briefly (**✅ Correct!** or a gentle correction) and move on.
 2. **PRACTICE** — Run EXACTLY ${EXERCISES} exercises, **📝 Exercise 1** … **📝 Exercise ${EXERCISES}**, getting slightly harder, on FRESH examples. Mark each with ✅/❌, give **✏️ Better:** ONLY if your version differs from theirs (skip it when they're already word-for-word correct), and a one-line **💡 Why:**.
-3. **PRODUCE** — Then **🗣️ Your turn:** ask them to write their OWN sentence using this rule in a real business situation. Give specific feedback (praise + one fix if needed).
-4. Finish: a one-line recap, then EXACTLY this line on its own:  **🎉 Lesson complete!** — then encourage them to use it in their next recording.
+3. **PRODUCE** — Send **🗣️ Your turn:** asking them to write their OWN sentence using this rule in a real business situation. This message contains ONLY that prompt — NO recap and NO completion line. Then STOP and WAIT for their sentence.
+4. **FINISH** — ONLY after they reply to "Your turn", give specific feedback (praise + one fix if needed), a one-line recap, then EXACTLY this line on its own:  **🎉 Lesson complete!** — then encourage them to use it in their next recording.
 
-Do NOT continue past the Produce step. Begin now with the theory.`;
+CRITICAL: never put **🎉 Lesson complete!** in the same message as **🗣️ Your turn:**, an exercise, or any question. The app ENDS the lesson the moment it sees "Lesson complete", which would rob them of their final turn. The completion line always stands alone in your final message. Do NOT continue past the Produce step. Begin now with the theory.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,9 @@ TEACH WITH THE PPP METHOD (Present → Practice → Produce). Work through the r
 
 Then move to the next rule. Keep every message short.
 
-After the last rule, give a brief recap and end with EXACTLY this line on its own:  **🎉 Lesson complete!** — then encourage them to RECORD AGAIN and use these rules for real.
+After the last rule's PRODUCE step — and ONLY after they have replied to that final "🗣️ Your turn:" and you've given feedback — send a separate closing message: a brief recap, then EXACTLY this line on its own:  **🎉 Lesson complete!** — then encourage them to RECORD AGAIN and use these rules for real.
+
+CRITICAL: never put **🎉 Lesson complete!** in the same message as **🗣️ Your turn:**, an exercise, or any question. The app ENDS the session the moment it sees "Lesson complete", which would rob them of their final turn. The completion line always stands alone in your final message.
 Start by greeting briefly (**👋**), say you'll work through the rules behind this recording, then begin the first rule's UNDERSTAND step.`;
 }
 

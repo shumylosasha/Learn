@@ -87,10 +87,20 @@ export default function PracticeScreen() {
   const inputRef = useRef<TextInput>(null);
   const kickedOff = useRef(false);
 
-  // A finite session is "complete" once the tutor posts the completion marker.
+  // A finite session is "complete" once the tutor posts the completion marker —
+  // UNLESS that same message still asks for input (a "🗣️ Your turn:" prompt or
+  // tappable options). The tutor sometimes bundles the completion line with the
+  // final produce step; honouring it then would hide the input and trap the
+  // learner before they can answer. Defer completion until they've responded.
   const lastMsg = messages[messages.length - 1];
+  const stillAsking =
+    lastMsg?.role === 'assistant' &&
+    (lastMsg.content.includes('🗣️') || parseOptions(lastMsg.content).length >= 2);
   const complete =
-    finite && lastMsg?.role === 'assistant' && COMPLETE_MARKER.test(lastMsg.content);
+    finite &&
+    lastMsg?.role === 'assistant' &&
+    COMPLETE_MARKER.test(lastMsg.content) &&
+    !stillAsking;
 
   useEffect(() => {
     load(threadId);
